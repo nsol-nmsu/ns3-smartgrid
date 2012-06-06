@@ -46,6 +46,8 @@ NS_LOG_COMPONENT_DEFINE ("PrintIntrospectedDoxygen");
 
 namespace
 {
+  std::string g_showGroupOnly;     ///< command-line option to retrospect a selected group
+
   std::string anchor;              ///< hyperlink anchor
   std::string argument;            ///< function argument
   std::string boldStart;           ///< start of bold span
@@ -474,7 +476,8 @@ PrintAllAttributes (std::ostream & os)
     {
       TypeId tid = TypeId::GetRegistered (i);
       if (tid.GetAttributeN () == 0 ||
-	  tid.MustHideFromDocumentation ())
+	  tid.MustHideFromDocumentation () ||
+          (!g_showGroupOnly.empty() && tid.GetGroupName () != g_showGroupOnly))
 	{
 	  continue;
 	}
@@ -598,7 +601,8 @@ PrintAllTraceSources (std::ostream & os)
     {
       TypeId tid = TypeId::GetRegistered (i);
       if (tid.GetTraceSourceN () == 0 ||
-	  tid.MustHideFromDocumentation ())
+	  tid.MustHideFromDocumentation () ||
+          (!g_showGroupOnly.empty() && tid.GetGroupName () != g_showGroupOnly))
 	{
 	  continue;
 	}
@@ -1315,10 +1319,11 @@ GetNameMap (const StaticInformation & info)
   for (uint32_t i = 0; i < TypeId::GetRegisteredN (); i++)
     {
       TypeId tid = TypeId::GetRegistered (i);
-      if (tid.MustHideFromDocumentation ())
-	{
-	  continue;
-	}
+      if (tid.MustHideFromDocumentation () ||
+          (!g_showGroupOnly.empty() && tid.GetGroupName () != g_showGroupOnly))
+        {
+          continue;
+        }
       
       // Capitalize all of letters in the name so that it sorts
       // correctly in the map.
@@ -1398,6 +1403,7 @@ int main (int argc, char *argv[])
   cmd.Usage ("Generate documentation for all ns-3 registered types, "
 	     "trace sources, attributes and global variables.");
   cmd.AddValue ("output-text", "format output as plain text", outputText);
+  cmd.AddValue ("group", "print information only for the specified group", g_showGroupOnly);
   cmd.Parse (argc, argv);
     
   SetMarkup (outputText);
@@ -1434,7 +1440,8 @@ int main (int argc, char *argv[])
       if (i >= 0)
         {
           tid = TypeId::GetRegistered (i);
-          if (tid.MustHideFromDocumentation ())
+          if (tid.MustHideFromDocumentation () ||
+              (!g_showGroupOnly.empty() && tid.GetGroupName () != g_showGroupOnly))
             {
               continue;
             }
