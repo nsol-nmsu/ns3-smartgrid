@@ -173,7 +173,7 @@ class Node(PyVizObject):
 
             self.emit("query-extra-tooltip-info", lines)
 
-            mob = ns3_node.GetObject(ns.mobility.MobilityModel.GetTypeId())
+            mob = ns.mobility.MobilityModel.GetMobilityModel (ns3_node)
             if mob is not None:
                 lines.append('  <b>Mobility Model</b>: %s' % mob.GetInstanceTypeId().GetName())
 
@@ -308,7 +308,7 @@ class Node(PyVizObject):
     def has_mobility(self):
         if self._has_mobility is None:
             node = ns.network.NodeList.GetNode(self.node_index)
-            mobility = node.GetObject(ns.mobility.MobilityModel.GetTypeId())
+            mobility = ns.mobility.MobilityModel.GetMobilityModel (node)
             self._has_mobility = (mobility is not None)
         return self._has_mobility
 
@@ -761,7 +761,9 @@ class Visualizer(gobject.GObject):
             node_name = "Node %i" % nodeI
             node_view = self.get_node(nodeI)
 
-            mobility = node.GetObject(ns.mobility.MobilityModel.GetTypeId())
+            mobility = ns.mobility.MobilityModel.GetMobilityModel (node)
+
+            # print "Mobility type: " + mobility.GetInstanceTypeId().GetName()
             if mobility is not None:
                 node_view.set_color("red")
                 pos = mobility.GetPosition()
@@ -822,7 +824,7 @@ class Visualizer(gobject.GObject):
 
         print "scanning topology: all done."
         self.emit("topology-scanned")
-
+        
     def get_node(self, index):
         try:
             return self.nodes[index]
@@ -868,7 +870,7 @@ class Visualizer(gobject.GObject):
         for node in self.nodes.itervalues():
             if node.has_mobility:
                 ns3_node = ns.network.NodeList.GetNode(node.node_index)
-                mobility = ns3_node.GetObject(ns.mobility.MobilityModel.GetTypeId())
+                mobility = ns.mobility.MobilityModel.GetMobilityModel (ns3_node)
                 if mobility is not None:
                     pos = mobility.GetPosition()
                     x, y = transform_point_simulation_to_canvas(pos.x, pos.y)
@@ -1221,7 +1223,7 @@ class Visualizer(gobject.GObject):
         self.simulation.lock.acquire()
         try:
             ns3_node = ns.network.NodeList.GetNode(node.node_index)
-            mob = ns3_node.GetObject(ns.mobility.MobilityModel.GetTypeId())
+            mob = ns.mobility.MobilityModel.GetMobilityModel (ns3_node)
             if mob is None:
                 return
             if self.node_drag_state is not None:
@@ -1238,7 +1240,7 @@ class Visualizer(gobject.GObject):
         self.simulation.lock.acquire()
         try:
             ns3_node = ns.network.NodeList.GetNode(node.node_index)
-            mob = ns3_node.GetObject(ns.mobility.MobilityModel.GetTypeId())
+            mob = ns.mobility.MobilityModel.GetMobilityModel (ns3_node)
             if mob is None:
                 return False
             if self.node_drag_state is None:
