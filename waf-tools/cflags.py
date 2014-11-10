@@ -19,7 +19,7 @@ class GccTraits(CompilerTraits):
 	def __init__(self):
 		super(GccTraits, self).__init__()
 		# cumulative list of warnings per level
-		self.warnings_flags = [['-Wall']]
+		self.warnings_flags = [['-Wall', '-std=c++11']]
 
 	def get_warnings_flags(self, level):
 		warnings = []
@@ -47,7 +47,7 @@ class GccTraits(CompilerTraits):
 			return (['-g'], [])
 		elif level >= 2:
 			return (['-ggdb', '-g3'], ['_DEBUG'])
-		
+
 
 class IccTraits(CompilerTraits):
 	def __init__(self):
@@ -55,7 +55,7 @@ class IccTraits(CompilerTraits):
 		# cumulative list of warnings per level
 		# icc is _very_ verbose with -Wall, -Werror is barely achievable
 		self.warnings_flags = [[], [], ['-Wall']]
-		
+
 	def get_warnings_flags(self, level):
 		warnings = []
 		for l in range(level):
@@ -82,7 +82,7 @@ class IccTraits(CompilerTraits):
 			return (['-g'], [])
 		elif level >= 2:
 			return (['-ggdb', '-g3'], ['_DEBUG'])
-		
+
 
 
 class MsvcTraits(CompilerTraits):
@@ -163,7 +163,7 @@ def configure(conf):
 	if not (cc or cxx):
 		raise Utils.WafError("neither COMPILER_CC nor COMPILER_CXX are defined; "
 				     "maybe the compiler_cc or compiler_cxx tool has not been configured yet?")
-	
+
 	try:
 		compiler = compiler_mapping[cc]
 	except KeyError:
@@ -179,7 +179,7 @@ def configure(conf):
 	optimizations = compiler.get_optimization_flags(opt_level)
 	debug, debug_defs = compiler.get_debug_flags(dbg_level)
 	warnings = compiler.get_warnings_flags(warn_level)
-	
+
 	if cc and not conf.env['CCFLAGS']:
 		conf.env.append_value('CCFLAGS', optimizations)
 		conf.env.append_value('CCFLAGS', debug)

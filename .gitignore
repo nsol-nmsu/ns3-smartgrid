@@ -48,4 +48,5 @@ massif.*
 src/ndnSIM
 configure
 toggle
+.ns3rc
 
