@@ -1,4 +1,3 @@
-
 ## -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
 
 import os, os.path
@@ -335,8 +334,8 @@ class ns3pcfile_task(Task.Task):
 
     def __str__(self):
         "string to display to the user"
-        tgt_str = ' '.join([a.bldpath() for a in self.outputs])
-        return 'pcfile: %s\n' % (tgt_str)
+        tgt_str = ' '.join([a.path_from(a.ctx.launch_node()) for a in self.outputs])
+        return 'pcfile: %s' % (tgt_str)
 
     def runnable_status(self):
         return super(ns3pcfile_task, self).runnable_status()
@@ -473,13 +472,19 @@ class ns3header_task(Task.Task):
     def __str__(self):
         "string to display to the user"
         env = self.env
-        src_str = ' '.join([a.bldpath() for a in self.inputs])
-        tgt_str = ' '.join([a.bldpath() for a in self.outputs])
+        src_str = ' '.join([a.path_from(a.ctx.launch_node()) for a in self.inputs])
+        tgt_str = ' '.join([a.path_from(a.ctx.launch_node()) for a in self.outputs])
         if self.outputs: sep = ' -> '
         else: sep = ''
         if self.mode == 'remove':
-            return 'rm-ns3-header %s' % (self.header_to_remove.abspath(),)
-        return 'install-ns3-header: %s' % (tgt_str)
+            return '%s' % (self.header_to_remove.abspath(),)
+        return '%s%s%s' % (src_str, sep, tgt_str)
+
+    def keyword(self):
+        if self.mode == 'remove':
+            return "Removing"
+        else:
+            return "Copying"
 
     def __repr__(self):
         return str(self)
@@ -644,13 +649,13 @@ class gen_ns3_module_header_task(Task.Task):
     def __str__(self):
         "string to display to the user"
         env = self.env
-        src_str = ' '.join([a.bldpath() for a in self.inputs])
-        tgt_str = ' '.join([a.bldpath() for a in self.outputs])
+        src_str = ' '.join([a.path_from(a.ctx.launch_node()) for a in self.inputs])
+        tgt_str = ' '.join([a.path_from(a.ctx.launch_node()) for a in self.outputs])
         if self.outputs: sep = ' -> '
         else: sep = ''
         if self.mode == 'remove':
             return 'rm-module-header %s' % (self.header_to_remove.abspath(),)
-        return 'gen-module-header: %s' % (tgt_str)
+        return 'gen-module-header: %s%s%s' % (src_str, sep, tgt_str)
 
     def run(self):
         if self.mode == 'remove':

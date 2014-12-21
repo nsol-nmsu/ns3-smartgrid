@@ -21,8 +21,8 @@ class command_task(Task.Task):
 	def __str__(self):
 		"string to display to the user"
 		env = self.env
-		src_str = ' '.join([a.bldpath() for a in self.inputs])
-		tgt_str = ' '.join([a.bldpath() for a in self.outputs])
+		src_str = ' '.join([a.path_from(a.ctx.launch_node()) for a in self.inputs])
+		tgt_str = ' '.join([a.path_from(a.ctx.launch_node()) for a in self.outputs])
 		if self.outputs:
 			sep = ' -> '
 		else:
@@ -31,7 +31,7 @@ class command_task(Task.Task):
 		pipeline = shellcmd.Pipeline()
 		pipeline.parse(self.generator.command)
 		cmd = pipeline.get_abbreviated_command()
-		return 'command (%s): %s%s%s\n' % (cmd, src_str, sep, tgt_str)
+		return 'command (%s): %s%s%s' % (cmd, src_str, sep, tgt_str)
 
 	def _subst_arg(self, arg, direction, namespace):
 		"""
