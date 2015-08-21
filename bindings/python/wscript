@@ -163,11 +163,22 @@ def configure(conf):
                                      "PyBindGen missing")
         return
     else:
-        out = subprocess.Popen([conf.env['PYTHON'][0], "-c",
-                                "import pybindgen.version; "
-                                "print(pybindgen.__version__)"],
-                                stdout=subprocess.PIPE).communicate()[0]
-        pybindgen_version = out.strip()
+        def getVersion():
+            out = subprocess.Popen([conf.env['PYTHON'][0], "-c",
+                                    "try:\n"
+                                    "  import pybindgen.version\n"
+                                    "  print(pybindgen.__version__)\n"
+                                    "except:\n"
+                                    "  pass"],
+                                    stdout=subprocess.PIPE).communicate()[0]
+            return out.strip()
+        pybindgen_version = getVersion()
+        if pybindgen_version == '': # version is not generated yet (e.g., cloned from git repo directly)
+            subprocess.Popen([conf.env['PYTHON'][0], "setup.py", "--version"],
+                              cwd=conf.env['WITH_PYBINDGEN'],
+                              stdout=subprocess.PIPE).communicate()[0]
+            pybindgen_version = getVersion()
+
         conf.msg('Checking for pybindgen version', pybindgen_version)
         if not (pybindgen_version == REQUIRED_PYBINDGEN_VERSION):
             Logs.warn("pybindgen (found %r), (need %r)" %
