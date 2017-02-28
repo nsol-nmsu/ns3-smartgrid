@@ -3,6 +3,10 @@
 def build(bld):
     module = bld.create_ns3_module('applications', ['internet', 'config-store','stats'])
     module.source = [
+        'model/icens-header.cc',
+        'model/icens-producer.cc',
+        'model/icens-aggregator.cc',
+        'model/icens-subscriber.cc',
         'model/bulk-send-application.cc',
         'model/onoff-application.cc',
         'model/packet-sink.cc',
@@ -27,6 +31,7 @@ def build(bld):
         'helper/udp-echo-helper.cc',
         'helper/v4ping-helper.cc',
         'helper/radvd-helper.cc',
+	'helper/app-helper.cc',
         ]
 
     applications_test = bld.create_ns3_module_test_library('applications')
@@ -37,6 +42,10 @@ def build(bld):
     headers = bld(features='ns3header')
     headers.module = 'applications'
     headers.source = [
+        'model/icens-header.h',
+        'model/icens-producer.h',
+        'model/icens-aggregator.h',
+        'model/icens-subscriber.h',
         'model/bulk-send-application.h',
         'model/onoff-application.h',
         'model/packet-sink.h',
@@ -61,6 +70,7 @@ def build(bld):
         'helper/udp-echo-helper.h',
         'helper/v4ping-helper.h',
         'helper/radvd-helper.h',
+	'helper/app-helper.h',
         ]
 
     bld.ns3_python_bindings()

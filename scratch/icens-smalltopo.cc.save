@@ -1,0 +1,310 @@
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation;
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+#include <fstream>
+#include <string>
+#include <stdlib.h>
+#include <iomanip>
+#include <iostream>
+
+#include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/point-to-point-module.h"
+#include "ns3/applications-module.h"
+#include "ns3/internet-module.h"
+#include "ns3/flow-monitor-module.h"
+#include "ns3/ipv4-global-routing-helper.h"
+#include "ns3/icens-subscriber.h"
+#include "ns3/point-to-point-net-device.h"
+
+using namespace ns3;
+
+NS_LOG_COMPONENT_DEFINE ("iCenS");
+
+// Vectors to store the various node types
+std::vector<int> com_nodes, agg_nodes, phy_nodes;
+
+// Vectors to store source and destination edges to fail
+std::vector<int> srcedge, dstedge;
+
+// Vectors to store agg<--->com and phy<--->agg p2p IPs, packets are directed to these IP addresses
+std::vector<std::string> com_ips, map_to_agg_ip;
+std::vector<int> map_from_phy_node;
+
+bool NodeInComm(int);
+bool NodeInAgg(int);
+bool NodeInPhy(int);
+
+int main (int argc, char *argv[])
+{
+
+  CommandLine cmd;
+  cmd.Parse (argc, argv);
+
+  //--- Count the number of nodes to create
+  std::ifstream nfile ("src/ndnSIM/examples/test-nodes.txt", std::ios::in);
+
+  std::string nodeid, nodename, nodetype;
+  int nodecount = 0; //number of nodes in topology
+  int numOfPMUs = 2; //number of PMUs
+
+  if (nfile.is_open ()) {
+  	while (nfile >> nodeid >> nodename >> nodetype) {
+		nodecount += 1;
+
+		if (nodename.substr(0,4) == "com_") {
+			com_nodes.push_back(std::stoi(nodeid));
+		}
+		else if (nodename.substr(0,4) == "agg_") {
+			agg_nodes.push_back(std::stoi(nodeid));
+		}
+		else if (nodename.substr(0,4) == "phy_") {
+			phy_nodes.push_back(std::stoi(nodeid));
+		}
+		else {
+			std::cout << "Error::Node not classified" << std::endl;
+		}
+  	}
+  }
+  else {
+	std::cout << "Error::Cannot open nodes file!!!" << std::endl;
+	return 1;
+  }
+  nfile.close();
+
+  // Setting default parameters for PointToPoint links and channels
+  //pointToPoint.SetDeviceAttribute ("Mtu", StringValue ("100"));
+
+  //Create network nodes
+  NodeContainer nodes;
+  nodes.Create(nodecount);
+
+  //Install internet protocol stack on nodes
+  InternetStackHelper stack;
+  stack.Install (nodes);
+
+  // Connect nodes using point to point links
+  PointToPointHelper p2p;
+
+  //--- Get the edges of the graph from file and connect them
+  std::ifstream efile ("src/ndnSIM/examples/test-edges.txt", std::ios::in);
+
+  std::string srcnode, dstnode, bw, delay, edgetype;
+
+  //Declare objects for network devices, addresses and interfaces
+  NetDeviceContainer devices;
+  Ipv4AddressHelper address;
+
+  // Use class A 10.0.0.0/x for point to point links, set the base
+  int octet1 = 10, octet2 = 0, octet3 = 0, octet4 = 0;
+  std::string subnet, mask = "255.255.255.252";
+
+  if (efile.is_open ()) {
+        while (efile >> srcnode >> dstnode >> bw >> delay >> edgetype) {
+                //Set delay and bandwidth parameters for point-to-point links
+                p2p.SetDeviceAttribute("DataRate", StringValue(bw+"Mbps"));
+                p2p.SetChannelAttribute("Delay", StringValue(delay+"ms"));
+                devices = p2p.Install(nodes.Get(std::stoi(srcnode)), nodes.Get(std::stoi(dstnode)));
+
+		if (octet4 < 256) {
+			subnet = std::to_string(octet1) + "." + std::to_string(octet2) + "." + std::to_string(octet3) + "." + std::to_string(octet4);
+			address.SetBase (Ipv4Address(subnet.c_str()), Ipv4Mask(mask.c_str()));
+	                address.Assign (devices);
+			octet4 += 4;
+		}
+		else {
+			// 4th octet subnets exhausted
+			if (octet3 < 255) {
+				octet3 += 1;
+				octet4 = 0;
+				subnet = std::to_string(octet1) + "." + std::to_string(octet2) + "." + std::to_string(octet3) + "." + std::to_string(octet4);
+				address.SetBase (Ipv4Address(subnet.c_str()), Ipv4Mask(mask.c_str()));
+                        	address.Assign (devices);
+                        	octet4 += 4;
+			}
+			else {
+				// 3rd octet exhausted
+				if (octet2 < 255) {
+					octet2 += 1;
+					octet3 += 0;
+					octet4 += 0;
+					subnet = std::to_string(octet1) + "." + std::to_string(octet2) + "." + std::to_string(octet3) + "." + std::to_string(octet4);
+                                	address.SetBase (Ipv4Address(subnet.c_str()), Ipv4Mask(mask.c_str()));
+                                	address.Assign (devices);
+					octet4 += 4;
+				}
+				else {
+					// 2nd octet exhausted
+					// Graph size for simulation can accommodate this, no need to moe 1st octect to 11.x.x.x
+				}
+			}
+		}
+
+                // Determine if an edge is between compute and aggregation node - some of these edges will be failed during simulation
+                if (NodeInComm(stoi(srcnode)) && NodeInAgg(stoi(dstnode))) {
+                        srcedge.push_back(stoi(srcnode));
+                        dstedge.push_back(stoi(dstnode));
+			// Store first IP as com
+			com_ips.push_back(std::to_string(octet1) + "." + std::to_string(octet2) + "." + std::to_string(octet3) + "." + std::to_string(octet4 + 1));
+                }
+                if (NodeInAgg(stoi(srcnode)) && NodeInComm(stoi(dstnode))) {
+                        srcedge.push_back(stoi(srcnode));
+                        dstedge.push_back(stoi(dstnode));
+			// Store second IP as com
+                        com_ips.push_back(std::to_string(octet1) + "." + std::to_string(octet2) + "." + std::to_string(octet3) + "." + std::to_string(octet4 + 2));
+                }
+
+		// Determine if an edge is between aggregation and physical node - maps physical nodes to the aggregation node it connects to
+                if (NodeInPhy(stoi(srcnode)) && NodeInAgg(stoi(dstnode))) {
+                        map_from_phy_node.push_back(stoi(srcnode));
+                        map_to_agg_ip.push_back(std::to_string(octet1) + "." + std::to_string(octet2) + "." + std::to_string(octet3) + "." + std::to_string(octet4 + 2));
+                }
+
+                if (NodeInAgg(stoi(srcnode)) && NodeInPhy(stoi(dstnode))) {
+                        map_from_phy_node.push_back(stoi(dstnode));
+                        map_to_agg_ip.push_back(std::to_string(octet1) + "." + std::to_string(octet2) + "." + std::to_string(octet3) + "." + std::to_string(octet4 + 2)std::to_string(octet1) + "." + std::to_string(octet2) + "." + std::to_string(octet3) + "." + std::to_string(octet4 + 2));
+                }
+
+std::cout << srcnode << " " << dstnode << 
+        }
+  }
+  else {
+        std::cout << "Error::Cannot open edges file!!!" << std::endl;
+        return 1;
+  }
+  efile.close();
+
+
+for (int i=0; i<(int)com_ips.size(); i++) {
+std::cout << "com ip " << com_ips[i] << std::endl;
+}
+
+
+  //Setup network segments with IP addresses
+  devices = p2p.Install (nodes.Get(0), nodes.Get(1));
+  address.SetBase ("10.10.1.0", "255.255.255.252");
+  Ipv4InterfaceContainer interfaces1 = address.Assign (devices);
+
+  devices = p2p.Install (nodes.Get(1), nodes.Get(2));
+  address.SetBase ("10.10.2.0", "255.255.255.252");
+  Ipv4InterfaceContainer interfaces2 = address.Assign (devices);
+
+  devices = p2p.Install (nodes.Get(2), nodes.Get(3));
+  address.SetBase ("10.10.3.0", "255.255.255.252");
+  Ipv4InterfaceContainer interfaces3 = address.Assign (devices);
+
+  devices = p2p.Install (nodes.Get(3), nodes.Get(4));
+  address.SetBase ("10.10.4.0", "255.255.255.252");
+  Ipv4InterfaceContainer interfaces4 = address.Assign (devices);
+
+
+
+
+
+  //Populate the routing table
+  Ipv4GlobalRoutingHelper::PopulateRoutingTables();
+
+  //Install producer application on compute nodes for PMU
+  uint16_t pmuPort = 7000;
+  ns3::AppHelper proHelper ("ns3::iCenSProducer");
+  proHelper.SetAttribute ("LocalPort", UintegerValue (pmuPort));
+  proHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.0)));
+  ApplicationContainer proApps = proHelper.Install (nodes.Get (4));
+
+  //proApps = proHelper.Install (nodes.Get (6));
+
+  //Install aggregator application on aggregation nodes for PMU
+  ns3::AppHelper aggHelper ("ns3::iCenSAggregator");
+  aggHelper.SetAttribute ("LocalPort", UintegerValue (pmuPort));
+  aggHelper.SetAttribute ("Frequency", TimeValue (Seconds (2)));
+  aggHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (interfaces4.GetAddress (1), pmuPort)));
+  //aggHelper.SetAttribute ("Offset", UintegerValue (500));
+  ApplicationContainer aggApps = aggHelper.Install (nodes.Get (2));
+
+  //Install subscriber application on physical nodes for PMU
+  ns3::AppHelper subHelper ("ns3::iCenSSubscriber");
+  ApplicationContainer subApps;
+
+  subHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (interfaces2.GetAddress (1), pmuPort)));
+  subHelper.SetAttribute ("PacketSize", UintegerValue (470));
+  subHelper.SetAttribute ("Subscription", UintegerValue (0));
+  subHelper.SetAttribute ("Frequency", TimeValue (Seconds (1)));
+  subApps = subHelper.Install (nodes.Get (0));
+  //subApps.Start (Seconds (0.2));
+
+
+
+/*
+  ApplicationContainer subApps2;
+  subHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (interfaces3.GetAddress (0), pmuMsgPort)));
+  subHelper.SetAttribute ("PacketSize", UintegerValue (120));
+  subHelper.SetAttribute ("Subscription", UintegerValue (0));
+  subHelper.SetAttribute ("Frequency", TimeValue (Seconds (3)));
+  subApps2 = subHelper.Install (nodes.Get (3));
+  //subApps2.Start (Seconds (0.0));
+*/
+
+/*
+  Ptr<Ipv4> ipv4n2 = nodes.Get(2)->GetObject<Ipv4> ();
+  Simulator::Schedule (Seconds (1.0),&Ipv4::SetDown,ipv4n2, 2); //bring down the second p2p interface attached on node 3
+  Simulator::Schedule (Seconds (1.5),&Ipv4::SetUp,ipv4n2, 2);
+
+  Ptr<Ipv4> ipv4n4 = nodes.Get(4)->GetObject<Ipv4> ();
+  Simulator::Schedule (Seconds (2),&Ipv4::SetDown,ipv4n4, 2); //bring down the second p2p interface attached on node 4
+  Simulator::Schedule (Seconds (4),&Ipv4::SetUp,ipv4n4, 2);
+*/
+
+/*
+  // Trace routing tables
+  Ipv4GlobalRoutingHelper g;
+  Ptr<OutputStreamWrapper> routingStream = Create<OutputStreamWrapper> ("dynamic-global-routing.routes", std::ios::out);
+  g.PrintRoutingTableAllAt (Seconds (1), routingStream);
+*/
+
+  //Run actual simulation
+  Simulator::Stop (Seconds(5.0));
+  Simulator::Run ();
+  Simulator::Destroy ();
+
+}
+
+bool NodeInComm(int nodeid) {
+        for (int i=0; i<(int)com_nodes.size(); i++) {
+                if (com_nodes[i] == nodeid) {
+                        return true;
+                }
+        }
+        return false;
+}
+
+bool NodeInAgg(int nodeid) {
+        for (int i=0; i<(int)agg_nodes.size(); i++) {
+                if (agg_nodes[i] == nodeid) {
+                        return true;
+                }
+        }
+        return false;
+}
+
+bool NodeInPhy(int nodeid) {
+        for (int i=0; i<(int)phy_nodes.size(); i++) {
+                if (phy_nodes[i] == nodeid) {
+                        return true;
+                }
+        }
+        return false;
+}
+
