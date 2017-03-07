@@ -92,12 +92,14 @@ iCenSAggregator::GetTypeId (void)
 
 iCenSAggregator::iCenSAggregator ()
   : m_socket (0),
+    m_comp_socket (0),
     m_remote_address (),
     m_packet_size (0),
     m_sendEvent (),
     m_running (false),
     m_subscription (0),
-    m_firstTime (true)
+    m_firstTime (true),
+    m_totalpayload (0)
 {
 }
 
@@ -127,6 +129,29 @@ iCenSAggregator::StartApplication (void)
 
   m_socket->SetRecvCallback (MakeCallback (&iCenSAggregator::HandleRead, this));
   m_socket6->SetRecvCallback (MakeCallback (&iCenSAggregator::HandleRead, this));
+
+  // Create socket (only once) to compute node that this aggregator sends packets to
+  if (m_comp_socket == 0) {
+        m_comp_socket = Socket::CreateSocket (GetNode(), TypeId::LookupByName (m_socket_type));
+
+        if (InetSocketAddress::IsMatchingType (m_remote_address) == true)
+        {
+            m_comp_socket->Bind ();
+            m_comp_socket->Connect (m_remote_address);
+        }
+        else if (Inet6SocketAddress::IsMatchingType (m_remote_address) == true)
+        {
+            m_comp_socket->Bind6 ();
+            m_comp_socket->Connect (m_remote_address);
+        }
+        else
+        {
+            NS_ASSERT_MSG (false, "Incompatible address type: " << m_remote_address);
+        }
+  }
+
+  //Handle acknowledgement responses back from compute nodes on the new socket
+  m_comp_socket->SetRecvCallback (MakeCallback (&iCenSAggregator::HandleACK, this));
 
   //Send aggregated packets at scheduled rate
   ScheduleAggPackets();
@@ -162,7 +187,8 @@ iCenSAggregator::ScheduleAggPackets ()
 	m_sendEvent = Simulator::Schedule(Seconds(double(m_offset)/1000), &iCenSAggregator::ScheduleAggPackets, this);
     }
     else {
-         m_sendEvent = Simulator::Schedule (m_frequency, &iCenSAggregator::SendAggPacket, this);
+	if (!m_sendEvent.IsRunning())
+        	m_sendEvent = Simulator::Schedule (m_frequency, &iCenSAggregator::SendAggPacket, this);
     }
 }
 
@@ -173,27 +199,10 @@ iCenSAggregator::SendAggPacket ()
   //If no payloaded interest received, do not send an interest with zero payload
   if (m_totalpayload > 0)
   {
-	//Create new socket to corresponding application on compute node
-        Ptr<Socket> comp_socket = Socket::CreateSocket (GetNode(), TypeId::LookupByName (m_socket_type));
-
-	if (InetSocketAddress::IsMatchingType (m_remote_address) == true)
-        {
-            comp_socket->Bind ();
-            comp_socket->Connect (m_remote_address);
-        }
-        else if (Inet6SocketAddress::IsMatchingType (m_remote_address) == true)
-        {
-            comp_socket->Bind6 ();
-            comp_socket->Connect (m_remote_address);
-        }
-        else
-        {
-            NS_ASSERT_MSG (false, "Incompatible address type: " << m_remote_address);
-        }
-
 	//Create a new packet the size of the aggregated payload and forward to compute node
 	Ptr<Packet> aggpacket = Create<Packet> (m_totalpayload);
-    	comp_socket->SendTo (aggpacket, 0, m_remote_address);
+    	//m_comp_socket->SendTo (aggpacket, 0, m_remote_address);
+	m_comp_socket->Send (aggpacket);
 
 	if (InetSocketAddress::IsMatchingType (m_remote_address))
 	{
@@ -205,9 +214,6 @@ iCenSAggregator::SendAggPacket ()
       		NS_LOG_INFO ("Node(" << GetNode()->GetId() << ") SENT AGGREGATED packet of size " << m_totalpayload << " bytes to " <<
          	Inet6SocketAddress::ConvertFrom (m_remote_address).GetIpv6 () << ":" << Inet6SocketAddress::ConvertFrom (m_remote_address).GetPort ());
     	}
-
-	//Handle acknowledgement responses back from compute nodes on the new socket
-	comp_socket->SetRecvCallback (MakeCallback (&iCenSAggregator::HandleACK, this));
 
 	//Reset total payload size to start accumulating subsequent ones
     	m_totalpayload = 0;
@@ -241,11 +247,12 @@ iCenSAggregator::HandleRead (Ptr<Socket> socket)
          Inet6SocketAddress::ConvertFrom (m_src_address).GetIpv6 () << ":" << Inet6SocketAddress::ConvertFrom (m_src_address).GetPort ());
     }
 
+    //Aggregate the payload size
+    m_totalpayload += packet->GetSize ();
+
     // Callback for received packet
     m_receivedPacket (GetNode()->GetId(), packet, m_src_address, m_local_port);
 
-    //Aggregate the payload size
-    m_totalpayload += packet->GetSize ();
 
   }
 

@@ -42,7 +42,7 @@ public:
    * \param ip The IP address of the remote udp echo server
    * \param port The port number of the remote udp echo server
    */
-  AppHelper (const std::string& appname);
+  AppHelper (std::string appname);
 
   /**
    * Record an attribute to be set in each Application after it is is created.

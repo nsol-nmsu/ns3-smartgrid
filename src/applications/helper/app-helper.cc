@@ -23,7 +23,7 @@
 
 namespace ns3 {
 
-AppHelper::AppHelper (const std::string& app)
+AppHelper::AppHelper (std::string app)
 {
   m_factory.SetTypeId (app);
 }

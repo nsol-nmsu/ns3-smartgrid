@@ -78,6 +78,7 @@ private:
 
   Ptr<Socket>     m_socket;
   Ptr<Socket>     m_socket6;
+  Ptr<Socket>	  m_comp_socket;
   Address         m_remote_address; //!< The destination address of the compute node to deliver aggregated payload to
   uint16_t        m_local_port; //!< The port on which to bind server application
   uint32_t        m_packet_size;
