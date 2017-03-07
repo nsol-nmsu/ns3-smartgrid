@@ -259,7 +259,7 @@ int main (int argc, char *argv[])
   uint16_t amiPort = 7000;
   uint16_t subPort = 8000;
 
-  ProducerHelper proHelper("ns3::iCenSProducer");
+  ProducerHelper proHelper;
   ApplicationContainer proApps;
 
   for (int i=0; i<(int)com_nodes.size(); i++) {

@@ -47,9 +47,6 @@ public:
    */
   ProducerHelper ();
 
-  ~ProducerHelper ();
-
-  ProducerHelper (std::string appName);
   /**
    * Record an attribute to be set in each Application after it is is created.
    *

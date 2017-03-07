@@ -29,14 +29,7 @@ namespace ns3 {
 
 ProducerHelper::ProducerHelper ()
 {
-}
-
-ProducerHelper::~ProducerHelper ()
-{
-}
-
-ProducerHelper::ProducerHelper (std::string appName) {
-  m_factory.SetTypeId (appName);
+  m_factory.SetTypeId ("ns3::iCenSProducer");
 }
 
 void
