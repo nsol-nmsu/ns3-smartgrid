@@ -364,45 +364,13 @@ int main (int argc, char *argv[])
   Ptr<Ipv4> ipv4node;
   for (int i=0; i<(int)node_link_map_fail.size(); i++) {
 	if (DisableLink) {
-  		ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-  		Simulator::Schedule (Seconds (364.0),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-  		Simulator::Schedule (Seconds (364.1),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
 
-                ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-                Simulator::Schedule (Seconds (447.0),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-                Simulator::Schedule (Seconds (447.1),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
-
-                ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-                Simulator::Schedule (Seconds (383.0),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-                Simulator::Schedule (Seconds (383.1),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
-
-                ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-                Simulator::Schedule (Seconds (385.0),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-                Simulator::Schedule (Seconds (385.1),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
-
-                ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-                Simulator::Schedule (Seconds (429.0),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-                Simulator::Schedule (Seconds (429.1),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
-
-                ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-                Simulator::Schedule (Seconds (385.0),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-                Simulator::Schedule (Seconds (385.1),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
-
-                ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-                Simulator::Schedule (Seconds (401.0),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-                Simulator::Schedule (Seconds (401.1),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
-
-                ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-                Simulator::Schedule (Seconds (414.0),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-                Simulator::Schedule (Seconds (414.1),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
-
-                ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-                Simulator::Schedule (Seconds (411.0),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-                Simulator::Schedule (Seconds (411.1),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
-
-                ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-                Simulator::Schedule (Seconds (392.0),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-                Simulator::Schedule (Seconds (392.1),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
+                for (int j=0; j<360; j++) {
+                        int offset = (rand() % 3599) + 1;
+                        ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
+                        Simulator::Schedule (Seconds ( ((double)offset) ),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
+                        Simulator::Schedule (Seconds ( ((double)offset + 0.1) ),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
+                }
 
 		DisableLink = false;
 	}
