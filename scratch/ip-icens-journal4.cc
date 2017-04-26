@@ -30,6 +30,7 @@
 #include "ns3/point-to-point-net-device.h"
 #include "ns3/icens-app-helper.h"
 #include "ns3/drop-tail-queue.h"
+#include "ns3/netanim-module.h"
 
 namespace ns3 {
 
@@ -77,7 +78,7 @@ int main (int argc, char *argv[])
   cmd.Parse (argc, argv);
 
   //--- Count the number of nodes to create
-  std::ifstream nfile ("src/ndnSIM/examples/icens-nodes.txt", std::ios::in);
+  std::ifstream nfile ("src/ndnSIM/examples/icens-nodes1.txt", std::ios::in);
 
   std::string nodeid, nodename, nodetype;
   int nodecount = 0; //number of nodes in topology
@@ -125,7 +126,7 @@ int main (int argc, char *argv[])
   Config::SetDefault("ns3::DropTailQueue::MaxPackets", StringValue("5"));
 
   //--- Get the edges of the graph from file and connect them
-  std::ifstream efile ("src/ndnSIM/examples/icens-edges.txt", std::ios::in);
+  std::ifstream efile ("src/ndnSIM/examples/icens-edges1.txt", std::ios::in);
 
   std::string srcnode, dstnode, bw, delay, edgetype;
 
@@ -251,7 +252,7 @@ int main (int argc, char *argv[])
   Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
   // Set seed fo all random number generations
-  srand(5);
+  srand(20);
 
   //Install server applications on compute nodes
   uint16_t urgPort = 5000;
@@ -378,6 +379,31 @@ int main (int argc, char *argv[])
 		DisableLink = true;
 	}
   }
+
+  //Setting up animation
+  //Adding com nodes
+  for(int itr = 0; itr < (int)com_nodes.size(); itr++)
+  {
+        int yaxis = (rand() % 100) + 1;
+        AnimationInterface::SetConstantPosition(nodes.Get(com_nodes[itr]), itr*100+100, yaxis);
+  }
+
+  //Adding agg nodes
+  for(int itr = 0; itr < (int)agg_nodes.size(); itr++)
+  {
+        int yaxis = (rand() % 270) + 250;
+        AnimationInterface::SetConstantPosition(nodes.Get(agg_nodes[itr]), itr*10+10, yaxis);
+  }
+
+  //Adding phy nodes
+ for(int itr = 0; itr < (int)phy_nodes.size(); itr++)
+  {
+        int yaxis = (rand() % 1000) + 650;
+        if (yaxis > 1000) yaxis = 1000;
+        AnimationInterface::SetConstantPosition(nodes.Get(phy_nodes[itr]), itr+1, yaxis);
+  }
+
+  AnimationInterface anim("anim-ip-scenario4.xml");
 
   //Open trace file for writing
   tracefile.open("ip-icens-trace.csv", std::ios::out);

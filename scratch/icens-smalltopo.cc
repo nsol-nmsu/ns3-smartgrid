@@ -29,6 +29,7 @@
 #include "ns3/ipv4-global-routing-helper.h"
 #include "ns3/icens-subscriber.h"
 #include "ns3/point-to-point-net-device.h"
+#include "ns3/netanim-module.h"
 
 using namespace ns3;
 
@@ -366,6 +367,24 @@ int main (int argc, char *argv[])
 	}
   }
 */
+
+  AnimationInterface::SetConstantPosition(nodes.Get(com_nodes[0]), 500, 0);
+  AnimationInterface::SetConstantPosition(nodes.Get(com_nodes[1]), 250, 250);
+  AnimationInterface::SetConstantPosition(nodes.Get(com_nodes[2]), 750, 250);
+
+  AnimationInterface::SetConstantPosition(nodes.Get(agg_nodes[0]), 50, 500);
+  AnimationInterface::SetConstantPosition(nodes.Get(agg_nodes[1]), 375, 500);
+  AnimationInterface::SetConstantPosition(nodes.Get(agg_nodes[2]), 625, 500);
+  AnimationInterface::SetConstantPosition(nodes.Get(agg_nodes[3]), 950, 500);
+  AnimationInterface::SetConstantPosition(nodes.Get(agg_nodes[4]), 250, 750);
+  AnimationInterface::SetConstantPosition(nodes.Get(agg_nodes[5]), 750, 750);
+
+  AnimationInterface::SetConstantPosition(nodes.Get(phy_nodes[0]), 0, 1000);
+  AnimationInterface::SetConstantPosition(nodes.Get(phy_nodes[1]), 375, 1000);
+  AnimationInterface::SetConstantPosition(nodes.Get(phy_nodes[2]), 625, 1000);
+  AnimationInterface::SetConstantPosition(nodes.Get(phy_nodes[3]), 1000, 1000);
+
+  AnimationInterface anim("anim-ip-smalltopo.xml");
 
   //Open trace file for writing
   tracefile.open("ip-icens-trace.csv", std::ios::out);
