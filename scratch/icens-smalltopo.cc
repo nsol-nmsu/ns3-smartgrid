@@ -429,7 +429,7 @@ int main (int argc, char *argv[])
   }
 
   //Run actual simulation
-  Simulator::Stop (Seconds(5.0));
+  Simulator::Stop (Seconds(50.0));
   Simulator::Run ();
   Simulator::Destroy ();
 
@@ -440,6 +440,9 @@ int main (int argc, char *argv[])
 void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &address) {
 
 	int packetSize = packet->GetSize ();
+
+	//Remove 2 extra bytes used for subscription
+	packetSize = packetSize - 2;
 
 	packet->RemoveAllPacketTags ();
     	packet->RemoveAllByteTags ();
@@ -486,7 +489,7 @@ void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Addres
                 	ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                 	ss >> str_ip_address;
 
-		    tracefile << nodeid << ", recv, " << "/urgent/com/error/phy"  << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed
+		    tracefile << nodeid << ", recv, " << "/urgent/com/error/phy"  << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize - 2 << ", " << std::fixed
 				<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 		}
 
@@ -534,12 +537,18 @@ void ReceivedPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Addres
 }
 
 void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address,  uint32_t localport) {
+
+        int packetSize = packet->GetSize ();
+
+        //Remove 2 extra bytes used for subscription
+        packetSize = packetSize - 2;
+
 	if (localport == 6000) {
      	        std::stringstream ss;   std::string str_ip_address;
                 ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                 ss >> str_ip_address;
 
-        	tracefile << nodeid << ", recv, " << "/direct/agg/pmu/phy" << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packet->GetSize () << ", " << std::fixed 
+        	tracefile << nodeid << ", recv, " << "/direct/agg/pmu/phy" << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed 
 			<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 	}
 
@@ -548,7 +557,7 @@ void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Addres
                 ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                 ss >> str_ip_address;
 
-                tracefile << nodeid << ", recv, " << "/direct/agg/ami/phy" << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packet->GetSize () << ", " << std::fixed
+                tracefile << nodeid << ", recv, " << "/direct/agg/ami/phy" << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed
                         << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
         }
 

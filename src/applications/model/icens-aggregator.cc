@@ -248,7 +248,7 @@ iCenSAggregator::HandleRead (Ptr<Socket> socket)
     }
 
     //Aggregate the payload size
-    m_totalpayload += packet->GetSize ();
+    m_totalpayload += (packet->GetSize () - 2);
 
     // Callback for received packet
     m_receivedPacket (GetNode()->GetId(), packet, m_src_address, m_local_port);
