@@ -72,6 +72,11 @@ iCenSAggregator::GetTypeId (void)
                    TimeValue (Seconds (5.0)),
                    MakeTimeAccessor (&iCenSAggregator::m_frequency),
                    MakeTimeChecker ())
+    .AddAttribute ("Subscription",
+                   "The subscription value of the packet. 0-normal packet, 1-soft subscribe, 2-hard subscriber, 3-unsubsribe ",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&iCenSAggregator::m_subscription),
+                   MakeUintegerChecker<uint32_t> ())
     .AddAttribute ("Offset",
                    "Random offset from when to start aggregation of packets",
                    UintegerValue (0),
@@ -99,7 +104,9 @@ iCenSAggregator::iCenSAggregator ()
     m_running (false),
     m_subscription (0),
     m_firstTime (true),
-    m_totalpayload (0)
+    m_totalpayload (0),
+    m_recv_seq (0),
+    m_send_seq (100)
 {
 }
 
@@ -201,7 +208,19 @@ iCenSAggregator::SendAggPacket ()
   {
 	//Create a new packet the size of the aggregated payload and forward to compute node
 	Ptr<Packet> aggpacket = Create<Packet> (m_totalpayload);
-    	//m_comp_socket->SendTo (aggpacket, 0, m_remote_address);
+
+  	//Add subscription information (extra 4-bytes) to packet header and send
+  	iCenSHeader packetHeader;
+  	if (m_subscription == 0) {
+        	//Use sequence number in subscription field to identify non-subscription packets when received at destination (m_subscription=0)
+        	packetHeader.SetSubscription(m_send_seq);
+  	}
+  	else {
+        	//Leave subscription value in this field
+        	packetHeader.SetSubscription(m_subscription);
+  	}
+  	aggpacket->AddHeader(packetHeader);
+
 	m_comp_socket->Send (aggpacket);
 
 	if (InetSocketAddress::IsMatchingType (m_remote_address))
@@ -219,8 +238,10 @@ iCenSAggregator::SendAggPacket ()
     	m_totalpayload = 0;
 
         // Callback for sent packet
-        m_sentPacket (GetNode()->GetId(), aggpacket, m_remote_address);
+        m_sentPacket (GetNode()->GetId(), aggpacket, m_remote_address, m_send_seq);
 
+	//Increase sequence number for next packet
+  	m_send_seq = m_send_seq + 1;
   }
 
   //Schedule next aggregation
@@ -238,21 +259,27 @@ iCenSAggregator::HandleRead (Ptr<Socket> socket)
 
     if (InetSocketAddress::IsMatchingType (m_src_address))
     {
-      NS_LOG_INFO ("Node(" << GetNode()->GetId() << ") RECEIVED packet of size " << packet->GetSize () << " bytes from " <<
+      NS_LOG_INFO ("Node(" << GetNode()->GetId() << ") RECEIVED packet of size " << packet->GetSize () - 4 << " bytes from " <<
          InetSocketAddress::ConvertFrom (m_src_address).GetIpv4 () << ":" << InetSocketAddress::ConvertFrom (m_src_address).GetPort ());
     }
     else if (Inet6SocketAddress::IsMatchingType (m_src_address))
     {
-      NS_LOG_INFO ("Node(" << GetNode()->GetId() << ") RECEIVED packet of size " << packet->GetSize () << " bytes from " <<
+      NS_LOG_INFO ("Node(" << GetNode()->GetId() << ") RECEIVED packet of size " << packet->GetSize () - 4 << " bytes from " <<
          Inet6SocketAddress::ConvertFrom (m_src_address).GetIpv6 () << ":" << Inet6SocketAddress::ConvertFrom (m_src_address).GetPort ());
     }
 
     //Aggregate the payload size
-    m_totalpayload += (packet->GetSize () - 2);
+    m_totalpayload += (packet->GetSize () - 4);
+
+    //Subscription values >=100 are sequence numbers
+    iCenSHeader packetHeader;
+    packet->RemoveHeader(packetHeader);
+    if (packetHeader.GetSubscription() >= 100) {
+    	m_recv_seq = packetHeader.GetSubscription();
+    }
 
     // Callback for received packet
-    m_receivedPacket (GetNode()->GetId(), packet, m_src_address, m_local_port);
-
+    m_receivedPacket (GetNode()->GetId(), packet, m_src_address, m_local_port, m_recv_seq);
 
   }
 

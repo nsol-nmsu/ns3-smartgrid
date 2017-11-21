@@ -46,7 +46,7 @@ class iCenSProducer : public Application
 public:
 
 
-  typedef void (* ReceivedPacketTraceCallback) (uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport, uint32_t packetSize, uint32_t subscription);
+  typedef void (* ReceivedPacketTraceCallback) (uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport, uint32_t packetSize, uint32_t subscription, Ipv4Address localip);
   typedef void (* SentPacketTraceCallback) (uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport);
 
   /**
@@ -58,6 +58,8 @@ public:
   iCenSProducer ();
 
   virtual ~iCenSProducer();
+
+  bool IsNewClientConnection(Address client_address);
 
   /**
   * \brief Handle received packets
@@ -81,10 +83,13 @@ private:
   TypeId          m_tid;
   std::string	  m_socket_type;
   Time 		  m_frequency; //!< Time interval at which packets are sent
-  uint16_t	  m_subscription; //!< Subscription value of packet
+  uint32_t	  m_subscription; //!< Subscription value of packet
   bool		  m_firstTime;
+  size_t 	  m_subDataSize; //Size of subscription data, in Kbytes
+  std::vector<Address> m_client_addresses;
+  Ipv4Address     m_local_ip;
 
-  TracedCallback<uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t, uint32_t> m_receivedPacket;
+  TracedCallback<uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t, Ipv4Address> m_receivedPacket;
   TracedCallback<uint32_t, Ptr<Packet>, const Address &, uint32_t> m_sentPacket;
 
 };

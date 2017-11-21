@@ -87,14 +87,16 @@ private:
   TypeId          m_tid;
   std::string	  m_socket_type;
   Time 		  m_frequency; //!< Time interval at which packets are sent
-  uint16_t	  m_subscription; //!< Subscription value of packet
+  uint32_t	  m_subscription; //!< Subscription value of packet
   bool		  m_firstTime;
   size_t	  m_totalpayload;
   uint32_t	  m_offset;
   Address	  m_src_address; //!< The source address of the physical node that sent the payloaded packet
+  uint32_t	  m_recv_seq;
+  uint32_t	  m_send_seq;
 
-  TracedCallback<uint32_t, Ptr<Packet>, const Address &, uint32_t> m_receivedPacket;
-  TracedCallback<uint32_t, Ptr<Packet>, const Address &> m_sentPacket;
+  TracedCallback<uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t> m_receivedPacket;
+  TracedCallback<uint32_t, Ptr<Packet>, const Address &, uint32_t> m_sentPacket;
 
 };
 

@@ -42,13 +42,13 @@ public:
    * \brief Set subscription value of the packet
    *
    */
-  void SetSubscription (uint16_t data);
+  void SetSubscription (uint32_t data);
 
   /**
    * \brief Set subscription value of the packet
    *
    */
-  uint16_t GetSubscription (void);
+  uint32_t GetSubscription (void);
 
   // Overridden methods from NS3 Header Class
   virtual uint32_t GetSerializedSize (void) const;
@@ -57,7 +57,7 @@ public:
   virtual void Print (std::ostream &os) const;
 
 private:
-  uint8_t m_subscription;
+  uint32_t m_subscription;
 };
 
 } // namespace ns3

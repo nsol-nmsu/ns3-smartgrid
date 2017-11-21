@@ -76,7 +76,7 @@ iCenSSubscriber::GetTypeId (void)
                    "The subscription value of the packet. 0-normal packet, 1-soft subscribe, 2-hard subscriber, 3-unsubsribe ",
                    UintegerValue (0),
                    MakeUintegerAccessor (&iCenSSubscriber::m_subscription),
-                   MakeUintegerChecker<uint16_t> ())
+                   MakeUintegerChecker<uint32_t> ())
     .AddAttribute ("Offset",
                    "Random offset to start sending packets",
                    UintegerValue (0),
@@ -102,7 +102,8 @@ iCenSSubscriber::iCenSSubscriber ()
     m_packetSize (0),
     m_sendEvent (),
     m_running (false),
-    m_firstTime (true)
+    m_firstTime (true),
+    m_seq (100)
 {
 }
 
@@ -117,7 +118,7 @@ iCenSSubscriber::StartApplication (void)
 
   m_running = true;
 
-  if (m_socket == 0) {
+  if (m_socket == 0) {   
 
 	//Create socket
 	m_socket = Socket::CreateSocket (GetNode(), TypeId::LookupByName (m_socket_type));
@@ -179,9 +180,22 @@ iCenSSubscriber::SendPacket (void)
   //Create a packet of specified size and send through the socket
   Ptr<Packet> packet = Create<Packet> (m_packetSize);
 
-  //Add subscription information (extra 2-bytes) to packet header and send
+  //Add subscription information (extra 4-bytes) to packet header and send
   iCenSHeader packetHeader;
-  packetHeader.SetSubscription(m_subscription);
+  if (m_subscription == 0) {
+	//Use sequence number in subscription field to identify non-subscription packets when received at destination (m_subscription=0)
+  	packetHeader.SetSubscription(m_seq);
+  }
+  else {
+	//Leave subscription value in this field
+	packetHeader.SetSubscription(m_subscription);
+/*
+if(m_subscription == 1 || m_subscription == 2) {
+std::cout << "about to sent packet with SUB not seq " << m_subscription << std::endl;
+}
+*/
+
+  }
   packet->AddHeader(packetHeader);
 
   m_socket->Send (packet);
@@ -208,7 +222,10 @@ iCenSSubscriber::SendPacket (void)
   }
 
   // Callback for sent packet
-  m_sentPacket (GetNode()->GetId(), packet, m_remote_address);
+  m_sentPacket (GetNode()->GetId(), packet, m_remote_address, m_seq);
+
+  //Increase sequence number for next packet
+  m_seq = m_seq + 1;
 
   //Schedule next packet to be transmitted
   ScheduleNextPacket ();

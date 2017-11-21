@@ -41,11 +41,11 @@ iCenSHeader::GetInstanceTypeId (void) const
 }
 
 void
-iCenSHeader::SetSubscription (uint16_t subscription)
+iCenSHeader::SetSubscription (uint32_t subscription)
 {
   m_subscription = subscription;
 }
-uint16_t
+uint32_t
 iCenSHeader::GetSubscription (void)
 {
   return m_subscription;
@@ -54,19 +54,19 @@ iCenSHeader::GetSubscription (void)
 uint32_t
 iCenSHeader::GetSerializedSize (void) const
 {
-  //Two bytes of data to store
-  return 2;
+  //Four bytes of data to store
+  return 4;
 }
 void
 iCenSHeader::Serialize (Buffer::Iterator start) const
 {
-  start.WriteHtonU16 (m_subscription);
+  start.WriteHtonU32 (m_subscription);
 }
 uint32_t
 iCenSHeader::Deserialize (Buffer::Iterator start)
 {
-  m_subscription = start.ReadNtohU16 ();
-  return 2;
+  m_subscription = start.ReadNtohU32 ();
+  return 4;
 }
 void
 iCenSHeader::Print (std::ostream &os) const

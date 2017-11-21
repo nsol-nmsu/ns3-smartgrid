@@ -83,12 +83,13 @@ private:
   TypeId          m_tid;
   std::string	  m_socket_type;
   Time 		  m_frequency; //!< Time interval at which packets are sent 
-  uint16_t	  m_subscription; //!< Subscription value set in packet
+  uint32_t	  m_subscription; //!< Subscription value set in packet
   bool 		  m_firstTime;
   uint32_t 	  m_offset;
+  uint32_t	  m_seq;
 
   TracedCallback<uint32_t, Ptr<Packet>, const Address &> m_receivedPacket;
-  TracedCallback<uint32_t, Ptr<Packet>, const Address &> m_sentPacket;
+  TracedCallback<uint32_t, Ptr<Packet>, const Address &, uint32_t> m_sentPacket;
 };
 
 } //namespace

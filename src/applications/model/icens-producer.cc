@@ -93,7 +93,8 @@ iCenSProducer::iCenSProducer ()
     m_sendEvent (),
     m_running (false),
     m_subscription (0),
-    m_firstTime (true)
+    m_firstTime (true),
+    m_subDataSize (10)
 {
 }
 
@@ -173,9 +174,36 @@ void
 iCenSProducer::ScheduleTransmit (Ptr<Socket> socket, Address client_address)
 {
 
-    SendPacket(socket, client_address);
-    m_sendEvent = Simulator::Schedule (m_frequency, &iCenSProducer::ScheduleTransmit, this, socket, client_address);
+	//Do not send initial data before scheduling with the input frequency
+	if(IsNewClientConnection(client_address)) {
+		m_sendEvent = Simulator::Schedule (m_frequency, &iCenSProducer::ScheduleTransmit, this, socket, client_address);
+	}
+	else {
+		//Sent as multiple chunks, sice data is bigger than MTU of 1500
+		for (int i=0; i<(int)m_subDataSize; i++) {
+    			SendPacket(socket, client_address);
+		}
+    		m_sendEvent = Simulator::Schedule (m_frequency, &iCenSProducer::ScheduleTransmit, this, socket, client_address);	
+	}
+
 }
+
+bool
+iCenSProducer::IsNewClientConnection(Address client_address) {
+
+	//Check if client is already connected
+	for (int i=0; i<(int)m_client_addresses.size(); i++) {
+		if ( operator==(client_address, m_client_addresses[i]) ) {
+		//if ( str_client_address.compare(m_client_addresses[i]) == 0) {
+			return false;
+		}
+	}
+
+	//Add new client to vector
+	m_client_addresses.push_back( client_address );
+
+	return true;
+} 
 
 void
 iCenSProducer::HandleRead (Ptr<Socket> socket)
@@ -186,37 +214,42 @@ iCenSProducer::HandleRead (Ptr<Socket> socket)
   while ((packet = socket->RecvFrom (m_remote_address)))
   {
 
-   int packetSize = packet->GetSize();
+    //Get the first interface IP attached to this node (this is where socket is bound, true nodes that have only 1 IP)
+    //Ptr<NetDevice> PtrNetDevice = PtrNode->GetDevice(0);
+    Ptr <Node> PtrNode = this->GetNode();
+    Ptr<Ipv4> ipv4 = PtrNode->GetObject<Ipv4> (); 
+    Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);  
+    m_local_ip = iaddr.GetLocal (); 
 
     if (InetSocketAddress::IsMatchingType (m_remote_address))
     {
-      NS_LOG_INFO ("Node(" << GetNode()->GetId() << ") RECEIVED packet of size " << packet->GetSize () << " bytes from " <<
+      NS_LOG_INFO ("Node(" << GetNode()->GetId() << ") RECEIVED packet of size " << packet->GetSize () - 4 << " bytes from " <<
          InetSocketAddress::ConvertFrom (m_remote_address).GetIpv4 () << ":" << InetSocketAddress::ConvertFrom (m_remote_address).GetPort ());
     }
     else if (Inet6SocketAddress::IsMatchingType (m_remote_address))
     {
-      NS_LOG_INFO ("Node(" << GetNode()->GetId() << ") RECEIVED packet of size " << packet->GetSize () << " bytes from " <<
+      NS_LOG_INFO ("Node(" << GetNode()->GetId() << ") RECEIVED packet of size " << packet->GetSize () - 4 << " bytes from " <<
          Inet6SocketAddress::ConvertFrom (m_remote_address).GetIpv6 () << ":" << Inet6SocketAddress::ConvertFrom (m_remote_address).GetPort ());
     }
 
-    packet->RemoveAllPacketTags ();
-    packet->RemoveAllByteTags ();
+    //packet->RemoveAllPacketTags ();
+    //packet->RemoveAllByteTags ();
 
     //Get subscription value set in packet's payload
     iCenSHeader packetHeader;
     packet->RemoveHeader(packetHeader);
     m_subscription = packetHeader.GetSubscription();
     NS_LOG_INFO("SUBSCRIPTION value = " << m_subscription);
-
+    
     //Send packet through the socket
-    if (m_subscription == 0) {
-	//Zero byte acknowledgement
+    if (m_subscription >= 100 ) {
+	//Zero byte acknowledgement, for packets with sequence numbers (m_subscription >=100)
 	m_packet_size = 0;
     	SendPacket(socket,m_remote_address);
     }
     else if (m_subscription == 1 || m_subscription == 2) {
-        //Soft or Hard subsription set
 
+        //Soft or Hard subsription set
 	if (m_frequency != 0) {
 		//Application instance is set for demand-response flow, send separate packet to each client that subscribes
 		ScheduleTransmit(socket, m_remote_address);
@@ -224,8 +257,7 @@ iCenSProducer::HandleRead (Ptr<Socket> socket)
     }
 
     // Callback for received packet
-    m_receivedPacket (GetNode()->GetId(), packet, m_remote_address, m_local_port, packetSize, m_subscription);
-
+    m_receivedPacket (GetNode()->GetId(), packet, m_remote_address, m_local_port, m_subscription, m_local_ip);
   }
 
 }

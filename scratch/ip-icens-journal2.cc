@@ -37,14 +37,14 @@ namespace ns3 {
 //NS_LOG_COMPONENT_DEFINE ("iCenS");
 
 
-void SentPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &);
-void ReceivedPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t packetSize, uint32_t subscription);
+void SentPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &, uint32_t);
+void ReceivedPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t subscription, Ipv4Address local_ip);
 
 void SentPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t);
 void ReceivedPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &);
 
-void SentPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &);
-void ReceivedPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t localport);
+void SentPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t);
+void ReceivedPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t localport, uint32_t seqNo);
 
 // Vectors to store the various node types
 std::vector<int> com_nodes, agg_nodes, phy_nodes;
@@ -82,7 +82,7 @@ int main (int argc, char *argv[])
 
   std::string nodeid, nodename, nodetype;
   int nodecount = 0; //number of nodes in topology
-  int numOfPMUs = 20; //number of PMUs
+  int numOfPMUs = 20; //number of PMUs = 20
 
   if (nfile.is_open ()) {
   	while (nfile >> nodeid >> nodename >> nodetype) {
@@ -123,7 +123,7 @@ int main (int argc, char *argv[])
   //p2p.SetDeviceAttribute ("Mtu", StringValue ("18000"));
 
   // Setting default parameters for PointToPoint links and channels
-  Config::SetDefault("ns3::DropTailQueue::MaxPackets", StringValue("5"));
+  Config::SetDefault("ns3::DropTailQueue::MaxPackets", StringValue("10"));
 
   //--- Get the edges of the graph from file and connect them
   std::ifstream efile ("src/ndnSIM/examples/icens-edges5.txt", std::ios::in);
@@ -251,8 +251,8 @@ int main (int argc, char *argv[])
   //Populate the routing table
   Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-  // Set seed fo all random number generations
-  srand(10);
+  //Set seed for AMI offset. This seed produces best unique values
+  srand(1);
 
   //Install server applications on compute nodes
   uint16_t urgPort = 5000;
@@ -278,7 +278,7 @@ int main (int argc, char *argv[])
         proApps = proHelper.Install (nodes.Get (com_nodes[i]));
 	// Subscription messages
         proHelper.SetAttribute ("LocalPort", UintegerValue (subPort));
-        proHelper.SetAttribute ("Frequency", TimeValue (Seconds (600.0)));
+        proHelper.SetAttribute ("Frequency", TimeValue (Seconds (600.0))); //600.0
         proApps = proHelper.Install (nodes.Get (com_nodes[i]));
 
   }
@@ -288,21 +288,26 @@ int main (int argc, char *argv[])
   ApplicationContainer aggApps;
 
   for (int i=0; i<(int)agg_nodes.size(); i++) {
+
+	int offset = (rand() % 900) + 100;
+
+	int random_com = offset % (int)com_ips.size();
+
+        // AMI messages
+        aggHelper.SetAttribute ("LocalPort", UintegerValue (amiPort));
+        aggHelper.SetAttribute ("Frequency", TimeValue (Seconds (6)));
+        aggHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(com_ips[random_com].c_str()), amiPort)));
+        aggHelper.SetAttribute ("Offset", UintegerValue (offset));
+        aggApps = aggHelper.Install (nodes.Get (agg_nodes[i]));
+
+
   	// PMU messages
-	int random_com = (rand() % (int)com_ips.size());
+	//int random_com = (rand() % (int)com_ips.size());
 	aggHelper.SetAttribute ("LocalPort", UintegerValue (pmuPort));
 	aggHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.016)));
 	aggHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(com_ips[random_com].c_str()), pmuPort)));
 	aggHelper.SetAttribute ("Offset", UintegerValue (0));
 	aggApps = aggHelper.Install (nodes.Get (agg_nodes[i]));
-
-	// AMI messages
-        aggHelper.SetAttribute ("LocalPort", UintegerValue (amiPort));
-        aggHelper.SetAttribute ("Frequency", TimeValue (Seconds (6)));
-        aggHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(com_ips[random_com].c_str()), amiPort)));
-	int offset = (rand() % 900) + 100;
-	aggHelper.SetAttribute ("Offset", UintegerValue (offset));
-        aggApps = aggHelper.Install (nodes.Get (agg_nodes[i]));
 
   }
 
@@ -310,6 +315,9 @@ int main (int argc, char *argv[])
   //Install subscriber application on physical nodes for PMU
   SubscriberHelper consumerHelper;
   ApplicationContainer conApps;
+
+  //Random seed for PMU offset. This seed produces best unique values
+  srand(10);
 
   // Urgent messages are sent by PMUs to compute nodes for error reporting using
   for (int i=0; i<(int)phy_nodes.size(); i++) {
@@ -342,23 +350,34 @@ int main (int argc, char *argv[])
                 consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(GetAggIP(phy_nodes[i]).c_str()), amiPort)));
                 consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (6)));
                 consumerHelper.SetAttribute ("Subscription", UintegerValue (0));
-                consumerHelper.SetAttribute ("PacketSize", UintegerValue (60));
+                consumerHelper.SetAttribute ("PacketSize", UintegerValue (60)); //60
 		consumerHelper.SetAttribute ("Offset", UintegerValue (0));
-                conApps = consumerHelper.Install (nodes.Get (phy_to_agg_map[i].first));
+                conApps = consumerHelper.Install (nodes.Get ( phy_nodes[i] ));
         }
   }
+
+  //Use a counter to iterate through the the com IPs and subscribe
+  int comip_count = (int)com_ips.size();
+  int comip_index = 0;
 
   // Each physical layer node except PMUs, subscribe to compute prefix - "/overlay/com/subscription"
   for (int i=0; i<(int)phy_nodes.size(); i++) {
         if (i >= numOfPMUs) {
-                consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(com_ips[(int)com_ips.size() - 1].c_str()), subPort)));
+		if (comip_index >= comip_count) {
+			comip_index = 0;
+		}
+
+                consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(com_ips[ comip_index ].c_str()), subPort)));
                 consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (900000)));
                 consumerHelper.SetAttribute ("Subscription", UintegerValue (1));
 		consumerHelper.SetAttribute ("PacketSize", UintegerValue (0));
 		consumerHelper.SetAttribute ("Offset", UintegerValue (0));
                 conApps = consumerHelper.Install (nodes.Get (phy_nodes[i]));
+
+		comip_index = comip_index + 1;
 	}
   }
+
 
   //Disable and enable half of the links between com to agg nodes, for a number of times during simulation
   bool DisableLink = true;
@@ -380,6 +399,9 @@ int main (int argc, char *argv[])
 	}
   }
 
+
+/*
+
   //Setting up animation
   //Adding com nodes
   for(int itr = 0; itr < (int)com_nodes.size(); itr++)
@@ -387,6 +409,7 @@ int main (int argc, char *argv[])
         int yaxis = (rand() % 100) + 1;
         AnimationInterface::SetConstantPosition(nodes.Get(com_nodes[itr]), itr*100+100, yaxis);
   }
+
 
   //Adding agg nodes
   for(int itr = 0; itr < (int)agg_nodes.size(); itr++)
@@ -404,6 +427,7 @@ int main (int argc, char *argv[])
   }
 
   AnimationInterface anim("anim-ip-scenario2.xml");
+*/
 
   //Open trace file for writing
   tracefile.open("ip-icens-trace.csv", std::ios::out);
@@ -457,12 +481,12 @@ int main (int argc, char *argv[])
 
 
 //Define callbacks for writing to tracefile
-void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &address) {
+void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t seqNo) {
 
 	int packetSize = packet->GetSize ();
 
-	//Remove 2 extra bytes used for subscription
-        packetSize = packetSize - 2;
+	//Remove 4 extra bytes used for subscription
+        packetSize = packetSize - 4;
 
 	packet->RemoveAllPacketTags ();
     	packet->RemoveAllByteTags ();
@@ -476,40 +500,38 @@ void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &a
 	}
 	else {
 		if (InetSocketAddress::ConvertFrom (address).GetPort () == 5000) {
-			tracefile << nodeid << ", sent, " << "/urgent/com/error/phy" << nodeid << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed
+			tracefile << nodeid << ", sent, " << "/urgent/com/error/phy" << nodeid << "/" << seqNo << ", " << packetSize << ", " << std::fixed
 				<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 		}
                 if (InetSocketAddress::ConvertFrom (address).GetPort () == 6000) {
-                        tracefile << nodeid << ", sent, " << "/direct/agg/pmu/phy" << nodeid << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed
+                        tracefile << nodeid << ", sent, " << "/direct/agg/pmu/phy" << nodeid << "/" << seqNo << ", " << packetSize << ", " << std::fixed
                                 << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
                 if (InetSocketAddress::ConvertFrom (address).GetPort () == 7000) {
-                        tracefile << nodeid << ", sent, " << "/direct/agg/ami/phy" << nodeid << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed
+                        tracefile << nodeid << ", sent, " << "/direct/agg/ami/phy" << nodeid << "/" << seqNo << ", " << packetSize << ", " << std::fixed
                                 << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
 
 	}
 }
 
-void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport, uint32_t packetSize, uint32_t subscription) {
+void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport, uint32_t subscription, Ipv4Address local_ip) {
 
-        packet->RemoveAllPacketTags ();
-        packet->RemoveAllByteTags ();
+	int packetSize = packet->GetSize();
 
-        //Get subscription value set in packet's header
-        iCenSHeader packetHeader;
-        packet->RemoveHeader(packetHeader);
+	//Extra 4 bytes already removed at COM app layer while checking if sequence number is greater than 100
 
-	if (packetHeader.GetSubscription() == 1 || packetHeader.GetSubscription() == 2) {
+	if (subscription == 1 || subscription == 2) {
 		//Do not log subscription packet received at com nodes
 	}
 	else {
+		//At this point "subscription" parameter contains sequence number of packet
 		if (localport == 5000) {
                 	std::stringstream ss;   std::string str_ip_address;
                 	ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                 	ss >> str_ip_address;
 
-		    tracefile << nodeid << ", recv, " << "/urgent/com/error/phy"  << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize - 2 << ", " << std::fixed
+		    tracefile << nodeid << ", recv, " << "/urgent/com/error/phy"  << GetNodeFromIP(str_ip_address) << "/" << subscription << ", " << packetSize << ", " << std::fixed
 				<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 		}
 
@@ -518,7 +540,7 @@ void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Addres
                         ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                         ss >> str_ip_address;
 
-                    tracefile << nodeid << ", recv, " << "/direct/com/pmu/agg"  << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed
+                    tracefile << nodeid << ", recv, " << "/direct/com/pmu/agg"  << GetNodeFromIP(str_ip_address) << "/" << subscription << ", " << packetSize << ", " << std::fixed
                                 << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
 
@@ -527,7 +549,7 @@ void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Addres
                         ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                         ss >> str_ip_address;
 
-                    tracefile << nodeid << ", recv, " << "/direct/com/ami/agg"  << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed
+                    tracefile << nodeid << ", recv, " << "/direct/com/ami/agg"  << GetNodeFromIP(str_ip_address) << "/" << subscription << ", " << packetSize << ", " << std::fixed
                                 << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
 	}
@@ -539,7 +561,7 @@ void SentPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Address &a
 		//Do not log data for error, PMU ACK, AMI ACK from compute
 	}
 	else {
-		tracefile << nodeid << ", sent, " << "/overlay/com/subscription/" << packet->GetUid () << ", " << packet->GetSize () << ", " << std::fixed
+		tracefile << nodeid << ", sent, " << "/overlay/com/subscription/" << "0" << ", " << packet->GetSize () << ", " << std::fixed
         		<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 	}
 }
@@ -550,25 +572,24 @@ void ReceivedPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Addres
 	}
 	else {
 		if (InetSocketAddress::ConvertFrom (address).GetPort () == 8000) {
-			tracefile << nodeid << ", recv, " << "/overlay/com/subscription/" << packet->GetUid () << ", " << packet->GetSize () << ", " << std::fixed
+			tracefile << nodeid << ", recv, " << "/overlay/com/subscription/" << "0" << ", " << packet->GetSize () << ", " << std::fixed
 				<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 		}
 	}
 }
 
-void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address,  uint32_t localport) {
+void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address,  uint32_t localport, uint32_t seqNo) {
 
 	int packetSize = packet->GetSize ();
 
-        //Remove 2 extra bytes used for subscription
-        packetSize = packetSize - 2;
-
+        //Extra 4 bytes already removed at AGG app layer while checking if sequence number is greater than 100
+        
 	if (localport == 6000) {
      	        std::stringstream ss;   std::string str_ip_address;
                 ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                 ss >> str_ip_address;
 
-        	tracefile << nodeid << ", recv, " << "/direct/agg/pmu/phy" << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed 
+        	tracefile << nodeid << ", recv, " << "/direct/agg/pmu/phy" << GetNodeFromIP(str_ip_address) << "/" << seqNo << ", " << packetSize << ", " << std::fixed 
 			<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 	}
 
@@ -577,20 +598,26 @@ void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Addres
                 ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                 ss >> str_ip_address;
 
-                tracefile << nodeid << ", recv, " << "/direct/agg/ami/phy" << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed
+                tracefile << nodeid << ", recv, " << "/direct/agg/ami/phy" << GetNodeFromIP(str_ip_address) << "/" << seqNo << ", " << packetSize << ", " << std::fixed
                         << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
         }
 
 }
 
-void SentPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address) {
+void SentPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t seqNo) {
+
+	int packetSize = packet->GetSize ();
+
+        //Remove 4 extra bytes used for sequence number in subscription field
+        packetSize = packetSize - 4;
+
 	if (InetSocketAddress::ConvertFrom (address).GetPort () == 6000) {
-        	tracefile << nodeid << ", sent, " << "/direct/com/pmu/agg" << nodeid << "/" << packet->GetUid () << ", " << packet->GetSize () << ", " << std::fixed
+        	tracefile << nodeid << ", sent, " << "/direct/com/pmu/agg" << nodeid << "/" << seqNo << ", " << packetSize << ", " << std::fixed
 			<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 	}
 
         if (InetSocketAddress::ConvertFrom (address).GetPort () == 7000) {
-                tracefile << nodeid << ", sent, " << "/direct/com/ami/agg" << nodeid << "/" << packet->GetUid () << ", " << packet->GetSize () << ", " << std::fixed
+                tracefile << nodeid << ", sent, " << "/direct/com/ami/agg" << nodeid << "/" << seqNo << ", " << packetSize << ", " << std::fixed
                         << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
         }
 }
