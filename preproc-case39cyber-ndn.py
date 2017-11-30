@@ -19,7 +19,7 @@ def gettype(name):
 def main(infile):
 
     latlog = open("lat_%s" % infile, "w")
-    latlog.write("flowcls latency\n")
+    latlog.write("srcid dstid timesent timerecv latency flowcls\n")
 
     fh = open(infile)
     reader = csv.reader(fh, delimiter=',', skipinitialspace=True)
@@ -52,31 +52,31 @@ def main(infile):
                     #outstanding[name] = (t1, ps1 + payloadsize, c1 + 1)
                     raise Exception("whoa dupe")
                 else:
-                    outstanding[name] = (time, payloadsize, 1)
-            
+                    outstanding[name] = (time, payloadsize, 1, nodeid)
             if cls in ["PMU_COM", "AMI_COM"]:
                 agg_tmp[name] = agg_queue[(nodeid, cls[:3])]
                 agg_queue[(nodeid, cls)] = []
             
         elif event == "recv":
 	    if name in outstanding:
-            	t1, ps1, c1 = outstanding[name]
+            	t1, ps1, c1, sn1 = outstanding[name]
 	    else:
 		continue
             
             # don't remove outstanding pub-sub entry, it can be delivered multiple times
             if cls != "DATA":
-                if c1 == 1:
-                    del outstanding[name]
-                else:
-                    raise Exception("ddd")
-                    outstanding[name] = (t1, ps1 - payloadsize, c1 - 1)
+		pass #single interest packet can be delivered multiple times
+                #if c1 == 1:
+                    #del outstanding[name]
+                #else:
+                    #raise Exception("ddd")
+                    #outstanding[name] = (t1, ps1 - payloadsize, c1 - 1)
             
             latency = time - t1
             deliveredCount[cls] += 1
             deliveredSize[cls]  += ps1
 
-            latlog.write("%s %.6f\n" % (cls, latency))
+            latlog.write("%d %d %.9f %.9f %.9f %s\n" % (sn1, nodeid, t1, time, latency, cls))
             
             if cls in ["PMU_AGG", "AMI_AGG"]:
                 if not (nodeid, cls) in agg_queue:
@@ -95,11 +95,12 @@ def main(infile):
     metlog = open("met_%s" % infile, "w")
     metlog.write("flowcls recvcnt recvsize losscnt losssize\n")
 
-    for name, (time, payloadsize, count) in outstanding.items():
-        cls = gettype(name)
-        if cls != "DATA":
-            lostCount[cls] += 1
-            lostSize[cls]  += payloadsize
+    #for name, (time, payloadsize, count) in outstanding.items():
+        #cls = gettype(name)
+        #if cls != "DATA":
+            #lostCount[cls] += 1
+            #lostSize[cls]  += payloadsize
+
     #Declare variables to store PMU and AMI total bytes transmitted
     totalLossPMU = 0
     totalRecvPMU = 0
