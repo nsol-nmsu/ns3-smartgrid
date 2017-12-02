@@ -91,6 +91,8 @@ std::string GetAggIP(int);
 //Trace file
 std::ofstream tracefile;
 
+std::ofstream flowfile;
+
 //Gets current time to make packets unique
 time_t seconds;
 
@@ -105,6 +107,7 @@ int main (int argc, char *argv[])
 
   std::string strLine;
   bool gettingNodeCount = false, buildingNetworkTopo = false, attachingWACs = false, attachingPMUs = false, attachingPDCs = false, flowPMUtoPDC = false, flowPMUtoWAC = false;
+  bool failLinks = false;
   std::vector<std::string> netParams;
 
   NodeContainer nodes;
@@ -126,6 +129,10 @@ int main (int argc, char *argv[])
 
   uint16_t wacPort = 5000;
   uint16_t pdcPort = 6000;
+
+  Ptr<Ipv4> ipv4node;
+
+  flowfile.open("ip_all_flows.csv", std::ios::out);
 
   if (configFile.is_open ()) {
         while (std::getline(configFile, strLine)) {
@@ -155,6 +162,9 @@ int main (int argc, char *argv[])
                 if(strLine.substr(0,7) == "END_005") { flowPMUtoPDC = false; continue; }
 		if(strLine.substr(0,7) == "BEG_006") { flowPMUtoWAC = true; continue; }
                 if(strLine.substr(0,7) == "END_006") { flowPMUtoWAC = false; continue; }
+		if(strLine.substr(0,7) == "BEG_100") { failLinks = true; continue; }
+                if(strLine.substr(0,7) == "END_100") { failLinks = false; continue; }
+
 
 		if(gettingNodeCount == true) {
                         //Getting number of nodes to create
@@ -225,12 +235,15 @@ int main (int argc, char *argv[])
 
 			//Install flow app on PMUs to send data to PDCs
                 	consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(GetPDCIP(std::stoi(netParams[0])).c_str()), pdcPort)));
-                	consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (2)));
+                	consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.02))); //0.016 or 0.02
                 	consumerHelper.SetAttribute ("Subscription", UintegerValue (0));
                 	consumerHelper.SetAttribute ("PacketSize", UintegerValue (200));
                 	//int offset = (rand() % 91) + 1;
                 	consumerHelper.SetAttribute ("Offset", UintegerValue (0));
                 	conApps = consumerHelper.Install (nodes.Get (std::stoi(netParams[1])));
+
+			//Write flow to file
+			flowfile << netParams[0] << " " << netParams[1] << " PDC" << std::endl;
 		}
 		else if(flowPMUtoWAC == true) {
                         //Install apps on WACs and PMUs for data exchange
@@ -245,14 +258,26 @@ int main (int argc, char *argv[])
 
                         //Install flow app on PMUs to send data to WACs
                         consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(GetWACIP(std::stoi(netParams[0])).c_str()), wacPort)));
-                        consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (1)));
+                        consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.02))); //0.016 or 0.02
                         consumerHelper.SetAttribute ("Subscription", UintegerValue (0));
                         consumerHelper.SetAttribute ("PacketSize", UintegerValue (200));
                         //int offset = (rand() % 91) + 1;
                         consumerHelper.SetAttribute ("Offset", UintegerValue (0));
                         conApps = consumerHelper.Install (nodes.Get (std::stoi(netParams[1])));
 
+			//Write flow to file
+			flowfile << netParams[0] << " " << netParams[1] << " WAC" << std::endl;
+
                 }
+		else if(failLinks == true) {
+                        //Fail links specified in the config file
+                        netParams = SplitString(strLine);
+
+			ipv4node = nodes.Get(stoi(netParams[1]))->GetObject<Ipv4> ();
+                        Simulator::Schedule (Seconds ( ((double)stod(netParams[2])) ),&Ipv4::SetDown,ipv4node, stoi(netParams[4]));
+                        Simulator::Schedule (Seconds ( ((double)stod(netParams[3])) ),&Ipv4::SetUp,ipv4node, stoi(netParams[4]));
+
+		}
 		else {
 			//std::cout << "reading something else " << strLine << std::endl;
 		}
@@ -270,28 +295,6 @@ int main (int argc, char *argv[])
   //Populate the routing table
   Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-/*
-
-  //Disable and enable half of the links between com to agg nodes, for a number of times during simulation
-  bool DisableLink = true;
-  Ptr<Ipv4> ipv4node;
-  for (int i=0; i<(int)node_link_map_fail.size(); i++) {
-	if (DisableLink) {
-
-                for (int j=0; j<360; j++) {
-                        int offset = (rand() % 3599) + 1;
-                        ipv4node = nodes.Get(node_link_map_fail[i].first)->GetObject<Ipv4> ();
-                        Simulator::Schedule (Seconds ( ((double)offset) ),&Ipv4::SetDown,ipv4node, node_link_map_fail[i].second);
-                        Simulator::Schedule (Seconds ( ((double)offset + 0.1) ),&Ipv4::SetUp,ipv4node, node_link_map_fail[i].second);
-                }
-
-		DisableLink = false;
-	}
-	else {
-		DisableLink = true;
-	}
-  }
-*/
 
   //Open trace file for writing
   tracefile.open("ip-case39cyber-trace.csv", std::ios::out);
@@ -343,7 +346,7 @@ int main (int argc, char *argv[])
 
 
   //Run actual simulation
-  Simulator::Stop (Seconds(86400));
+  Simulator::Stop (Seconds(5.0));
   Simulator::Run ();
   Simulator::Destroy ();
 
@@ -432,13 +435,17 @@ void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &a
 		//Do not log subscription packets from phy nodes
 	}
 	else {
+		std::stringstream ss;   std::string str_ip_address;
+                        ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
+                        ss >> str_ip_address;
+
 		if (InetSocketAddress::ConvertFrom (address).GetPort () == 5000) {
-			tracefile << nodeid << ", sent, " << "/power/wac/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << seqNo << ", " << packetSize 
-			<< ", " << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
+			tracefile << nodeid << ", sent, " << "/power/wac/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << GetNodeFromIP(str_ip_address) << "/" <<
+				seqNo << ", " << packetSize << ", " << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 		}
                 if (InetSocketAddress::ConvertFrom (address).GetPort () == 6000) {
-                        tracefile << nodeid << ", sent, " << "/power/pdc/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << seqNo << ", " << packetSize 
-			<< ", " << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
+                        tracefile << nodeid << ", sent, " << "/power/pdc/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << GetNodeFromIP(str_ip_address) << "/" << 
+				seqNo << ", " << packetSize << ", " << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
                 if (InetSocketAddress::ConvertFrom (address).GetPort () == 7000) {
                         tracefile << nodeid << ", sent, " << "/direct/agg/ami/phy" << nodeid << "/" << seqNo << ", " << packetSize << ", " << std::fixed
@@ -464,8 +471,8 @@ void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Addres
                 	ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                 	ss >> str_ip_address;
 
-		    tracefile << nodeid << ", recv, " << "/power/wac/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << subscription << ", " << packetSize << ", " << std::fixed
-				<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
+		    tracefile << nodeid << ", recv, " << "/power/wac/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << nodeid << "/" << subscription << ", " << packetSize << ", " 
+			<< std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 		}
 
                 if (localport == 6000) {
@@ -473,8 +480,8 @@ void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Addres
                         ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                         ss >> str_ip_address;
 
-                    tracefile << nodeid << ", recv, " << "/power/pdc/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << subscription << ", " << packetSize << ", " << std::fixed
-                                << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
+                    tracefile << nodeid << ", recv, " << "/power/pdc/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << nodeid << "/" << subscription << ", " << packetSize << ", " 
+			<< std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
 
                 if (localport == 7000) {

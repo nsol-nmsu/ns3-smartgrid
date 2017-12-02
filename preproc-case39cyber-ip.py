@@ -31,7 +31,11 @@ def main(infile):
     outstanding = {}
     agg_queue = {}
     agg_tmp = {}
-    
+   
+    list_processed = []
+    list_wacflows = []
+    list_pdcflows = []
+ 
     for nodeid, event, name, payloadsize, time in reader:
     
         nodeid = int(nodeid)
@@ -52,14 +56,14 @@ def main(infile):
                     #outstanding[name] = (t1, ps1 + payloadsize, c1 + 1)
                     raise Exception("whoa dupe")
                 else:
-                    outstanding[name] = (time, payloadsize, 1, nodeid)
+                    outstanding[name] = (time, payloadsize, 1, nodeid, name)
             if cls in ["PMU_COM", "AMI_COM"]:
                 agg_tmp[name] = agg_queue[(nodeid, cls[:3])]
                 agg_queue[(nodeid, cls)] = []
             
         elif event == "recv":
 	    if name in outstanding:
-            	t1, ps1, c1, sn1 = outstanding[name]
+            	t1, ps1, c1, sn1, pktname  = outstanding[name]
 	    else:
 		continue
             
@@ -75,8 +79,9 @@ def main(infile):
             deliveredCount[cls] += 1
             deliveredSize[cls]  += ps1
 
-            latlog.write("%d %d %.9f %.9f %.9f %s\n" % (sn1, nodeid, t1, time, latency, cls))
-            
+            latlog.write("%d %d %.9f %.9f %.9f %s %s\n" % (sn1, nodeid, t1, time, latency, cls, name))
+            list_processed.append(str(sn1) + " " + str(nodeid) + " " + str(t1) + " " + str(time) + " " + str(latency) + " " + str(cls) + " " + str(name))
+ 
             if cls in ["PMU_AGG", "AMI_AGG"]:
                 if not (nodeid, cls) in agg_queue:
                     agg_queue[(nodeid, cls[:3])] = []
@@ -88,17 +93,85 @@ def main(infile):
 
     #latlog.close()
 
+    #Save all the flows
+    with open("ip_all_flows.csv") as flowfile:
+        for line in flowfile:
+                flowsplit = line.strip().split()
+                if flowsplit[2] == "WAC":
+                        list_wacflows.append(line.strip())
+                if flowsplit[2] == "PDC":
+                        list_pdcflows.append(line.strip())
+
+    flowcompleted = False
+    infinitelat = 999999
+    outcounter = 0
+
+    #Process each interest sent according to flow
+    for name in outstanding:
+	
+	outcounter += 1
+	print "Processing packet loss...", outcounter, "out of", len(outstanding)
+        
+        if "wac" in name:
+                #Check all WAC flows
+                wacsrcnode = outstanding[name][3]
+		wacdstnode = name.split("/")[5]
+		wacsrctime = outstanding[name][0]
+		wacpktname = outstanding[name][4]
+
+                for wflow in list_wacflows:
+                        flowcompleted = False
+                        #If flow exists, check if entry is in the processed list
+                        if (int(wacsrcnode) == int(wflow.split(" ")[1])) and (int(wacdstnode) == int(wflow.split(" ")[0])):
+                                #Verify if flow exist in processed file or not
+                                for procd in list_processed:
+                                        procditem = procd.split()
+                                        if (int(wacsrcnode) == int(procditem[0])) and (int(wflow.split(" ")[0]) == int(procditem[1])) and (wacpktname.strip() == procditem[6].strip()):
+                                                #print "Processing packet loss...WAC flow completed"
+						flowcompleted = True
+                                                break
+                                if flowcompleted == False:
+                                        print wacsrcnode, wflow.split(" ")[0], outstanding[name][4], "WAC packet loss!!!"
+					latlog.write("%d %d %.9f %.9f %.9f %s %s\n" % (int(wacsrcnode), int(wflow.split(" ")[0]), float(wacsrctime), infinitelat, infinitelat - float(wacsrctime) , "WAC", wacpktname))
+
+	if "pdc" in name:
+                #Check all PDC flows
+                pdcsrcnode = outstanding[name][3]
+                pdcdstnode = name.split("/")[5]
+                pdcsrctime = outstanding[name][0]
+                pdcpktname = outstanding[name][4]
+
+                for pflow in list_pdcflows:
+                        flowcompleted = False
+                        #If flow exists, check if entry is in the processed list
+                        if (int(pdcsrcnode) == int(pflow.split(" ")[1])) and (int(pdcdstnode) == int(pflow.split(" ")[0])):
+                                #Verify if flow exist in processed file or not
+                                for procd in list_processed:
+                                        procditem = procd.split()
+                                        if (int(pdcsrcnode) == int(procditem[0])) and (int(pflow.split(" ")[0]) == int(procditem[1])) and (pdcpktname.strip() == procditem[6].strip()):
+                                                #print "Processing packet loss...WAC flow completed"
+                                                flowcompleted = True
+                                                break
+                                if flowcompleted == False:
+                                        print pdcsrcnode, pflow.split(" ")[0], outstanding[name][4], "PDC packet loss!!!"
+                       			latlog.write("%d %d %.9f %.9f %.9f %s %s\n" % (int(pdcsrcnode), int(pflow.split(" ")[0]), float(pdcsrctime), infinitelat, infinitelat - float(pdcsrctime) , "PDC", pdcpktname))
+
+
+
+
+ 
     lostCount = {x: 0 for x in FLOW_TYPES}
     lostSize  = {x: 0 for x in FLOW_TYPES}
 
     metlog = open("met_%s" % infile, "w")
     metlog.write("flowcls recvcnt recvsize losscnt losssize\n")
 
-    for name, (time, payloadsize, count) in outstanding.items():
-        cls = gettype(name)
-        if cls != "DATA":
-            lostCount[cls] += 1
-            lostSize[cls]  += payloadsize
+    #for name, (time, payloadsize, count) in outstanding.items():
+        #cls = gettype(name)
+        #if cls != "DATA":
+            #lostCount[cls] += 1
+            #lostSize[cls]  += payloadsize
+
     #Declare variables to store PMU and AMI total bytes transmitted
     totalLossPMU = 0
     totalRecvPMU = 0
