@@ -6,7 +6,8 @@ FLOW_TYPES = {
     #'AMI_AGG' : "/direct/agg/ami/",
     #'AMI_COM' : "/direct/com/ami/",
     'WAC'   : "/power/wac/",
-    'PDC'   : "/power/pdc/"
+    'PDC'   : "/power/pdc/",
+    'BGD'   : "/power/bgd/"
     #'DATA'    : "/overlay/com/subscription"
 }
 
@@ -48,6 +49,8 @@ def main(infile):
             # pub-sub flow needs different handling due to multisource multicast
             if cls == "DATA":
                 outstanding[name] = (time, payloadsize, 1)
+	    elif cls == "BGD":
+		pass
             else:
                 if name in outstanding:
                     #(t1, ps1, c1) = outstanding[name]

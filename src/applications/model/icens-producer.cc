@@ -173,6 +173,7 @@ iCenSProducer::SendPacket (Ptr<Socket> socket, Address client_address)
 void
 iCenSProducer::ScheduleTransmit (Ptr<Socket> socket, Address client_address)
 {
+	double send_delay = 0.0; 
 
 	//Do not send initial data before scheduling with the input frequency
 	if(IsNewClientConnection(client_address)) {
@@ -181,7 +182,9 @@ iCenSProducer::ScheduleTransmit (Ptr<Socket> socket, Address client_address)
 	else {
 		//Sent as multiple chunks, sice data is bigger than MTU of 1500
 		for (int i=0; i<(int)m_subDataSize; i++) {
-    			SendPacket(socket, client_address);
+    			//SendPacket(socket, client_address);
+			Simulator::Schedule (Seconds(send_delay), &iCenSProducer::SendPacket, this, socket, client_address);
+			send_delay = send_delay + 0.03;
 		}
     		m_sendEvent = Simulator::Schedule (m_frequency, &iCenSProducer::ScheduleTransmit, this, socket, client_address);	
 	}

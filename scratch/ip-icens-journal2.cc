@@ -472,7 +472,7 @@ int main (int argc, char *argv[])
   }
 
   //Run actual simulation
-  Simulator::Stop (Seconds(3600));
+  Simulator::Stop (Seconds(3600.0));
   Simulator::Run ();
   Simulator::Destroy ();
 

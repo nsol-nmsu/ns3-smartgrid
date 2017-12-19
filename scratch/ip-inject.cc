@@ -50,7 +50,7 @@ void ReceivedPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t 
 // Vectors to store the various node types
 std::vector<int> com_nodes, agg_nodes, phy_nodes;
 
-// Vectors to store source and destination edges to fail
+//  Vectors to store source and destination edges to fail
 std::vector<int> srcedge, dstedge;
 
 // Vectors to store agg<--->com and phy<--->agg p2p IPs, packets are directed to these IP addresses
@@ -103,11 +103,11 @@ int main (int argc, char *argv[])
   cmd.Parse (argc, argv);
 
   // Open the configuration file for reading
-  std::ifstream configFile ("src/ndnSIM/examples/case39Cyber.txt", std::ios::in);
+  std::ifstream configFile ("src/ndnSIM/examples/case39Cyber2.txt", std::ios::in);
 
   std::string strLine;
   bool gettingNodeCount = false, buildingNetworkTopo = false, attachingWACs = false, attachingPMUs = false, attachingPDCs = false, flowPMUtoPDC = false, flowPMUtoWAC = false;
-  bool failLinks = false, injectData = false;
+  bool failLinks = false;
   std::vector<std::string> netParams;
 
   NodeContainer nodes;
@@ -129,7 +129,6 @@ int main (int argc, char *argv[])
 
   uint16_t wacPort = 5000;
   uint16_t pdcPort = 6000;
-  uint16_t bgdPort = 1000;
 
   Ptr<Ipv4> ipv4node;
 
@@ -165,8 +164,6 @@ int main (int argc, char *argv[])
                 if(strLine.substr(0,7) == "END_006") { flowPMUtoWAC = false; continue; }
 		if(strLine.substr(0,7) == "BEG_100") { failLinks = true; continue; }
                 if(strLine.substr(0,7) == "END_100") { failLinks = false; continue; }
-		if(strLine.substr(0,7) == "BEG_101") { injectData = true; continue; }
-                if(strLine.substr(0,7) == "END_101") { injectData = false; continue; }
 
 
 		if(gettingNodeCount == true) {
@@ -238,9 +235,9 @@ int main (int argc, char *argv[])
 
 			//Install flow app on PMUs to send data to PDCs
                 	consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(GetPDCIP(std::stoi(netParams[0])).c_str()), pdcPort)));
-                	consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.02))); //0.016 or 0.02
+                	consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.001))); //0.016 or 0.02
                 	consumerHelper.SetAttribute ("Subscription", UintegerValue (0));
-                	consumerHelper.SetAttribute ("PacketSize", UintegerValue (200));
+                	consumerHelper.SetAttribute ("PacketSize", UintegerValue (1024));
                 	//int offset = (rand() % 91) + 1;
                 	consumerHelper.SetAttribute ("Offset", UintegerValue (0));
                 	conApps = consumerHelper.Install (nodes.Get (std::stoi(netParams[1])));
@@ -261,7 +258,7 @@ int main (int argc, char *argv[])
 
                         //Install flow app on PMUs to send data to WACs
                         consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(GetWACIP(std::stoi(netParams[0])).c_str()), wacPort)));
-                        consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.02))); //0.016 or 0.02
+                        consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (2))); //0.016 or 0.02
                         consumerHelper.SetAttribute ("Subscription", UintegerValue (0));
                         consumerHelper.SetAttribute ("PacketSize", UintegerValue (200));
                         //int offset = (rand() % 91) + 1;
@@ -280,29 +277,6 @@ int main (int argc, char *argv[])
                         Simulator::Schedule (Seconds ( ((double)stod(netParams[2])) ),&Ipv4::SetDown,ipv4node, stoi(netParams[4]));
                         Simulator::Schedule (Seconds ( ((double)stod(netParams[3])) ),&Ipv4::SetUp,ipv4node, stoi(netParams[4]));
 
-		}
-		else if(injectData == true) {
-                        //Install apps on WACs, PDCs and PMUs for background data injection
-                        netParams = SplitString(strLine);
-
-			//Install app on target node to be used for background data injection
-                        proHelper.SetAttribute ("LocalPort", UintegerValue (bgdPort));
-                        proHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.0)));
-                        proApps = proHelper.Install (nodes.Get (std::stoi(netParams[0])));
-
-			std::string targetDOS = "";
-			if (netParams[4] == "PDC") targetDOS = GetPDCIP(std::stoi(netParams[0]));
-			if (netParams[4] == "WAC") targetDOS = GetWACIP(std::stoi(netParams[0]));
-
-                        //Install flow app on PMUs to send background data to target node
-                        consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(targetDOS.c_str()), bgdPort)));
-                        consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.001))); //0.001 = 1000pps
-                        consumerHelper.SetAttribute ("Subscription", UintegerValue (0));
-                        consumerHelper.SetAttribute ("PacketSize", UintegerValue (1024));
-                        consumerHelper.SetAttribute ("Offset", UintegerValue (0));
-                        ApplicationContainer bgdApps = consumerHelper.Install (nodes.Get (std::stoi(netParams[1])));
-			bgdApps.Start (Seconds (std::stod(netParams[2])));
-			bgdApps.Stop (Seconds (std::stod(netParams[3])));
 		}
 		else {
 			//std::cout << "reading something else " << strLine << std::endl;
@@ -473,10 +447,6 @@ void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &a
                         tracefile << nodeid << ", sent, " << "/power/pdc/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << GetNodeFromIP(str_ip_address) << "/" << 
 				seqNo << ", " << packetSize << ", " << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
-		if (InetSocketAddress::ConvertFrom (address).GetPort () == 1000) {
-                        tracefile << nodeid << ", sent, " << "/power/bgd/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << GetNodeFromIP(str_ip_address) << "/" <<
-                                seqNo << ", " << packetSize << ", " << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
-                }
                 if (InetSocketAddress::ConvertFrom (address).GetPort () == 7000) {
                         tracefile << nodeid << ", sent, " << "/direct/agg/ami/phy" << nodeid << "/" << seqNo << ", " << packetSize << ", " << std::fixed
                                 << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
@@ -512,15 +482,6 @@ void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Addres
 
                     tracefile << nodeid << ", recv, " << "/power/pdc/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << nodeid << "/" << subscription << ", " << packetSize << ", " 
 			<< std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
-                }
-
-		if (localport == 1000) {
-                        std::stringstream ss;   std::string str_ip_address;
-                        ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
-                        ss >> str_ip_address;
-
-                    tracefile << nodeid << ", recv, " << "/power/bgd/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << nodeid << "/" << subscription << ", " << packetSize << ", "
-                        << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
 
                 if (localport == 7000) {
@@ -658,8 +619,7 @@ std::string GetPDCIP(int pdcid) {
                 }
         }
         std::cout << "PDC " << pdcid << ", has no corresponding IP!!!!!" << std::endl;
-        
-	exit(1);
+        exit(1);
 }
 
 std::string GetWACIP(int wacid) {
@@ -669,8 +629,7 @@ std::string GetWACIP(int wacid) {
                 }
         }
         std::cout << "WAC " << wacid << ", has no corresponding IP!!!!!" << std::endl;
-        
-	exit(1);
+        exit(1);
 }
 
 
