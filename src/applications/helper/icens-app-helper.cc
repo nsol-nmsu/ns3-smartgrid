@@ -114,5 +114,64 @@ SubscriberHelper::Install (NodeContainer c)
   return apps;
 }
 
+//---
+
+
+iCenSTCPServerHelper::iCenSTCPServerHelper ()
+{ 
+  m_factory.SetTypeId ("ns3::iCenSTCPServer");
+}
+
+void
+iCenSTCPServerHelper::SetAttribute (std::string name, const AttributeValue &value)
+{ 
+  m_factory.Set (name, value);
+}
+
+ApplicationContainer
+iCenSTCPServerHelper::Install (NodeContainer c)
+{
+  ApplicationContainer apps;
+  for (NodeContainer::Iterator i = c.Begin (); i != c.End (); ++i)
+    {
+      Ptr<Node> node = *i;
+
+      m_server = m_factory.Create<iCenSTCPServer> ();
+      node->AddApplication (m_server);
+      apps.Add (m_server);
+
+    }
+  return apps;
+}
+
+//---
+
+
+iCenSTCPClientHelper::iCenSTCPClientHelper ()
+{ 
+  m_factory.SetTypeId ("ns3::iCenSTCPClient");
+}
+
+void
+iCenSTCPClientHelper::SetAttribute (std::string name, const AttributeValue &value)
+{
+  m_factory.Set (name, value);
+}
+
+ApplicationContainer
+iCenSTCPClientHelper::Install (NodeContainer c)
+{
+  ApplicationContainer apps;
+  for (NodeContainer::Iterator i = c.Begin (); i != c.End (); ++i)
+    {
+      Ptr<Node> node = *i;
+
+      m_server = m_factory.Create<iCenSTCPClient> ();
+      node->AddApplication (m_server);
+      apps.Add (m_server);
+
+    }
+  return apps;
+}
 
 } // namespace ns3

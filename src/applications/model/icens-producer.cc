@@ -75,11 +75,11 @@ iCenSProducer::GetTypeId (void)
     .AddTraceSource ("ReceivedPacket",
                      "A packet has been received",
                      MakeTraceSourceAccessor (&iCenSProducer::m_receivedPacket),
-                     "ns3::iCenSSubscriber::ReceivedPacketTraceCallback")
+                     "ns3::iCenSProducer::ReceivedPacketTraceCallback")
     .AddTraceSource ("SentPacket",
                      "A packet has been sent",
                      MakeTraceSourceAccessor (&iCenSProducer::m_sentPacket),
-                     "ns3::iCenSSubscriber::SentPacketTraceCallback")
+                     "ns3::iCenSProducer::SentPacketTraceCallback")
 
   ;
   return tid;
@@ -246,8 +246,8 @@ iCenSProducer::HandleRead (Ptr<Socket> socket)
     
     //Send packet through the socket
     if (m_subscription >= 100 ) {
-	//Zero byte acknowledgement, for packets with sequence numbers (m_subscription >=100)
-	m_packet_size = 0;
+	//1-byte acknowledgement, for packets with sequence numbers (m_subscription >=100)
+	m_packet_size = 1;
     	SendPacket(socket,m_remote_address);
     }
     else if (m_subscription == 1 || m_subscription == 2) {

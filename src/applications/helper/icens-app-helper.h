@@ -28,6 +28,8 @@
 #include "ns3/icens-producer.h"
 #include "ns3/icens-aggregator.h"
 #include "ns3/icens-subscriber.h"
+#include "ns3/icens-tcp-server.h"
+#include "ns3/icens-tcp-client.h"
 
 namespace ns3 {
 /**
@@ -140,6 +142,76 @@ private:
   ObjectFactory m_factory; //!< Object factory.
   Ptr<iCenSSubscriber> m_server; //!< The last created server application
 };
+
+
+class iCenSTCPServerHelper
+{
+public:
+  /**
+   * Create iCenSTCPServer which will make life easier for people trying
+   * to set up simulations with icens-subscriber application.
+   *
+   */
+  iCenSTCPServerHelper ();
+
+  /**
+   * Record an attribute to be set in each Application after it is is created.
+   *
+   * \param name the name of the attribute to set
+   * \param value the value of the attribute to set
+   */
+  void SetAttribute (std::string name, const AttributeValue &value);
+
+  /**
+   * Create one UDP server application on each of the Nodes in the
+   * NodeContainer.
+   *
+   * \param c The nodes on which to create the Applications.  The nodes
+   *          are specified by a NodeContainer.
+   * \returns The applications created, one Application per Node in the
+   *          NodeContainer.
+   */
+  ApplicationContainer Install (NodeContainer c);
+
+private:
+  ObjectFactory m_factory; //!< Object factory.
+  Ptr<iCenSTCPServer> m_server; //!< The last created server application
+};
+
+class iCenSTCPClientHelper
+{ 
+public:
+  /**
+   * Create iCenSTCPClient which will make life easier for people trying
+   * to set up simulations with icens-subscriber application.
+   *
+   */
+  iCenSTCPClientHelper ();
+
+  /**
+   * Record an attribute to be set in each Application after it is is created.
+   *
+   * \param name the name of the attribute to set
+   * \param value the value of the attribute to set
+   */
+  void SetAttribute (std::string name, const AttributeValue &value);
+
+  /**
+   * Create one UDP server application on each of the Nodes in the
+   * NodeContainer.
+   *
+   * \param c The nodes on which to create the Applications.  The nodes
+   *          are specified by a NodeContainer.
+   * \returns The applications created, one Application per Node in the
+   *          NodeContainer.
+   */
+  ApplicationContainer Install (NodeContainer c);
+
+private:
+  ObjectFactory m_factory; //!< Object factory.
+  Ptr<iCenSTCPClient> m_server; //!< The last created server application
+};
+
 
 } // namespace ns3
 

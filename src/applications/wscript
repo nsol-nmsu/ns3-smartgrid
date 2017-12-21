@@ -3,6 +3,8 @@
 def build(bld):
     module = bld.create_ns3_module('applications', ['internet', 'config-store','stats'])
     module.source = [
+	'model/icens-tcp-server.cc',
+	'model/icens-tcp-client.cc',
         'model/icens-header.cc',
         'model/icens-producer.cc',
         'model/icens-aggregator.cc',
@@ -44,6 +46,8 @@ def build(bld):
     headers = bld(features='ns3header')
     headers.module = 'applications'
     headers.source = [
+	'model/icens-tcp-server.h',
+	'model/icens-tcp-client.h',
         'model/icens-header.h',
         'model/icens-producer.h',
         'model/icens-aggregator.h',

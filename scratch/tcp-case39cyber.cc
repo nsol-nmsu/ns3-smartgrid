@@ -38,7 +38,7 @@ namespace ns3 {
 //NS_LOG_COMPONENT_DEFINE ("iCenS");
 
 
-void SentPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &, uint32_t);
+void SentPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t);
 void ReceivedPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t subscription, Ipv4Address local_ip);
 
 void SentPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t);
@@ -122,9 +122,9 @@ int main (int argc, char *argv[])
 
   std::pair<int,std::string> node_ip_pair;
 
-  ProducerHelper proHelper;
+  iCenSTCPServerHelper proHelper;
   ApplicationContainer proApps;
-  SubscriberHelper consumerHelper;
+  iCenSTCPClientHelper consumerHelper;
   ApplicationContainer conApps;
 
   uint16_t wacPort = 5000;
@@ -231,18 +231,18 @@ int main (int argc, char *argv[])
 
 			//Install app on unique PDC IDs
 			if (IsPDCAppInstalled(netParams[0]) == false) {
-				proHelper.SetAttribute ("LocalPort", UintegerValue (pdcPort));
-        			proHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.0)));
+				proHelper.SetAttribute ("Port", UintegerValue (pdcPort));
+        			//proHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.0)));
         			proApps = proHelper.Install (nodes.Get (std::stoi(netParams[0])));
 			}
 
 			//Install flow app on PMUs to send data to PDCs
                 	consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(GetPDCIP(std::stoi(netParams[0])).c_str()), pdcPort)));
-                	consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.02))); //0.016 or 0.02
+                	consumerHelper.SetAttribute ("Interval", TimeValue (Seconds (0.02))); //0.016 or 0.02
                 	consumerHelper.SetAttribute ("Subscription", UintegerValue (0));
                 	consumerHelper.SetAttribute ("PacketSize", UintegerValue (200));
                 	//int offset = (rand() % 91) + 1;
-                	consumerHelper.SetAttribute ("Offset", UintegerValue (0));
+                	//consumerHelper.SetAttribute ("Offset", UintegerValue (0));
                 	conApps = consumerHelper.Install (nodes.Get (std::stoi(netParams[1])));
 
 			//Write flow to file
@@ -254,18 +254,18 @@ int main (int argc, char *argv[])
 
                         //Install app on unique PDC IDs
                         if (IsWACAppInstalled(netParams[0]) == false) {
-                                proHelper.SetAttribute ("LocalPort", UintegerValue (wacPort));
-                                proHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.0)));
+                                proHelper.SetAttribute ("Port", UintegerValue (wacPort));
+                                //proHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.0)));
                                 proApps = proHelper.Install (nodes.Get (std::stoi(netParams[0])));
                         }
 
                         //Install flow app on PMUs to send data to WACs
                         consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(GetWACIP(std::stoi(netParams[0])).c_str()), wacPort)));
-                        consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.02))); //0.016 or 0.02
+                        consumerHelper.SetAttribute ("Interval", TimeValue (Seconds (0.02))); //0.016 or 0.02
                         consumerHelper.SetAttribute ("Subscription", UintegerValue (0));
                         consumerHelper.SetAttribute ("PacketSize", UintegerValue (200));
                         //int offset = (rand() % 91) + 1;
-                        consumerHelper.SetAttribute ("Offset", UintegerValue (0));
+                        //consumerHelper.SetAttribute ("Offset", UintegerValue (0));
                         conApps = consumerHelper.Install (nodes.Get (std::stoi(netParams[1])));
 
 			//Write flow to file
@@ -286,8 +286,8 @@ int main (int argc, char *argv[])
                         netParams = SplitString(strLine);
 
 			//Install app on target node to be used for background data injection
-                        proHelper.SetAttribute ("LocalPort", UintegerValue (bgdPort));
-                        proHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.0)));
+                        proHelper.SetAttribute ("Port", UintegerValue (bgdPort));
+                        //proHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.0)));
                         proApps = proHelper.Install (nodes.Get (std::stoi(netParams[0])));
 
 			std::string targetDOS = "";
@@ -296,10 +296,10 @@ int main (int argc, char *argv[])
 
                         //Install flow app on PMUs to send background data to target node
                         consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(targetDOS.c_str()), bgdPort)));
-                        consumerHelper.SetAttribute ("Frequency", TimeValue (Seconds (0.001))); //0.001 = 1000pps
+                        consumerHelper.SetAttribute ("Interval", TimeValue (Seconds (0.001))); //0.001 = 1000pps
                         consumerHelper.SetAttribute ("Subscription", UintegerValue (0));
                         consumerHelper.SetAttribute ("PacketSize", UintegerValue (1024));
-                        consumerHelper.SetAttribute ("Offset", UintegerValue (0));
+                        //consumerHelper.SetAttribute ("Offset", UintegerValue (0));
                         ApplicationContainer bgdApps = consumerHelper.Install (nodes.Get (std::stoi(netParams[1])));
 			bgdApps.Start (Seconds (std::stod(netParams[2])));
 			bgdApps.Stop (Seconds (std::stod(netParams[3])));
@@ -323,7 +323,7 @@ int main (int argc, char *argv[])
 
 
   //Open trace file for writing
-  tracefile.open("udp-case39cyber-trace.csv", std::ios::out);
+  tracefile.open("tcp-case39cyber-trace.csv", std::ios::out);
   tracefile << "nodeid, event, name, payloadsize, time" << std::endl;
 
   std::string strcallback;
@@ -443,7 +443,7 @@ std::string GetIPFromSubnet(std::string nodeid, std::string subnet) {
 }
 
 //Define callbacks for writing to tracefile
-void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t seqNo) {
+void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t seqNo, uint32_t subscription) {
 
 	int packetSize = packet->GetSize ();
 
@@ -454,10 +454,10 @@ void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &a
     	packet->RemoveAllByteTags ();
 
     	//Get subscription value set in packet's header
-    	iCenSHeader packetHeader;
-    	packet->RemoveHeader(packetHeader);
+    	//iCenSHeader packetHeader;
+    	//packet->RemoveHeader(packetHeader);
 
-	if (packetHeader.GetSubscription() == 1 || packetHeader.GetSubscription() == 2) {
+	if (subscription == 1 || subscription == 2) {
 		//Do not log subscription packets from phy nodes
 	}
 	else {
