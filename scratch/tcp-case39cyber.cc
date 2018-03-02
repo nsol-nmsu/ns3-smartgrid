@@ -114,7 +114,8 @@ int main (int argc, char *argv[])
   int nodeCount = 0;
 
   // Setting default parameters for PointToPoint links and channels
-  Config::SetDefault("ns3::DropTailQueue::MaxPackets", StringValue("10"));
+  Config::SetDefault("ns3::DropTailQueue::MaxPackets", StringValue("100"));
+  //Config::SetDefault ("ns3::TcpL4Protocol::SocketType", StringValue ("ns3::TcpNewReno"));
 
   PointToPointHelper p2p;
   NetDeviceContainer devices;
@@ -296,7 +297,7 @@ int main (int argc, char *argv[])
 
                         //Install flow app on PMUs to send background data to target node
                         consumerHelper.SetAttribute ("RemoteAddress", AddressValue (InetSocketAddress (Ipv4Address(targetDOS.c_str()), bgdPort)));
-                        consumerHelper.SetAttribute ("Interval", TimeValue (Seconds (0.001))); //0.001 = 1000pps
+                        consumerHelper.SetAttribute ("Interval", TimeValue (Seconds (0.0002))); //0.0002 = 5000pps
                         consumerHelper.SetAttribute ("Subscription", UintegerValue (0));
                         consumerHelper.SetAttribute ("PacketSize", UintegerValue (1024));
                         //consumerHelper.SetAttribute ("Offset", UintegerValue (0));
@@ -372,7 +373,7 @@ int main (int argc, char *argv[])
 
 
   //Run actual simulation
-  Simulator::Stop (Seconds(5.0));
+  Simulator::Stop (Seconds(300.0));
   Simulator::Run ();
   Simulator::Destroy ();
 
@@ -466,15 +467,15 @@ void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &a
                         ss >> str_ip_address;
 
 		if (InetSocketAddress::ConvertFrom (address).GetPort () == 5000) {
-			tracefile << nodeid << ", sent, " << "/power/wac/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << GetNodeFromIP(str_ip_address) << "/" <<
+			tracefile << nodeid << ", sent, " << "/power/wac/data/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << GetNodeFromIP(str_ip_address) << "/" <<
 				seqNo << ", " << packetSize << ", " << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 		}
                 if (InetSocketAddress::ConvertFrom (address).GetPort () == 6000) {
-                        tracefile << nodeid << ", sent, " << "/power/pdc/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << GetNodeFromIP(str_ip_address) << "/" << 
+                        tracefile << nodeid << ", sent, " << "/power/pdc/data/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << GetNodeFromIP(str_ip_address) << "/" << 
 				seqNo << ", " << packetSize << ", " << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
 		if (InetSocketAddress::ConvertFrom (address).GetPort () == 1000) {
-                        tracefile << nodeid << ", sent, " << "/power/bgd/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << GetNodeFromIP(str_ip_address) << "/" <<
+                        tracefile << nodeid << ", sent, " << "/power/bgd/data/phy" << nodeid << "/" << InetSocketAddress::ConvertFrom (address).GetIpv4 () << "/" << GetNodeFromIP(str_ip_address) << "/" <<
                                 seqNo << ", " << packetSize << ", " << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
                 if (InetSocketAddress::ConvertFrom (address).GetPort () == 7000) {
@@ -501,7 +502,7 @@ void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Addres
                 	ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                 	ss >> str_ip_address;
 
-		    tracefile << nodeid << ", recv, " << "/power/wac/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << nodeid << "/" << subscription << ", " << packetSize << ", " 
+		    tracefile << nodeid << ", recv, " << "/power/wac/data/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << nodeid << "/" << subscription << ", " << packetSize << ", " 
 			<< std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
 		}
 
@@ -510,7 +511,7 @@ void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Addres
                         ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                         ss >> str_ip_address;
 
-                    tracefile << nodeid << ", recv, " << "/power/pdc/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << nodeid << "/" << subscription << ", " << packetSize << ", " 
+                    tracefile << nodeid << ", recv, " << "/power/pdc/data/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << nodeid << "/" << subscription << ", " << packetSize << ", " 
 			<< std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
 
@@ -519,7 +520,7 @@ void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Addres
                         ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                         ss >> str_ip_address;
 
-                    tracefile << nodeid << ", recv, " << "/power/bgd/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << nodeid << "/" << subscription << ", " << packetSize << ", "
+                    tracefile << nodeid << ", recv, " << "/power/bgd/data/phy"  << GetNodeFromIP(str_ip_address) << "/" << local_ip << "/" << nodeid << "/" << subscription << ", " << packetSize << ", "
                         << std::fixed << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
 

@@ -108,7 +108,7 @@ def main(infile):
                         list_pdcflows.append(line.strip())
 
     flowcompleted = False
-    infinitelat = 999999
+    infinitelat = 400
     outcounter = 0
 
     #Process each interest sent according to flow

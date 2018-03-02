@@ -20,7 +20,7 @@ def gettype(name):
 def main(infile):
 
     latlog = open("lat_%s" % infile, "w")
-    latlog.write("srcid dstid timesent timerecv latency flowcls\n")
+    latlog.write("srcid dstid timesent timerecv latency flowcls pktname\n")
 
     fh = open(infile)
     reader = csv.reader(fh, delimiter=',', skipinitialspace=True)
@@ -106,7 +106,7 @@ def main(infile):
                         list_pdcflows.append(line.strip())
 
     flowcompleted = False
-    infinitelat = 999999
+    infinitelat = 400
     outcounter = 0
 
     #Process each interest sent according to flow
@@ -118,7 +118,7 @@ def main(infile):
         if "wac" in name:
                 #Check all WAC flows
                 wacsrcnode = outstanding[name][3]
-		wacdstnode = name.split("/")[5]
+		wacdstnode = name.split("/")[6]
 		wacsrctime = outstanding[name][0]
 		wacpktname = outstanding[name][4]
 
@@ -140,7 +140,7 @@ def main(infile):
 	if "pdc" in name:
                 #Check all PDC flows
                 pdcsrcnode = outstanding[name][3]
-                pdcdstnode = name.split("/")[5]
+                pdcdstnode = name.split("/")[6]
                 pdcsrctime = outstanding[name][0]
                 pdcpktname = outstanding[name][4]
 
