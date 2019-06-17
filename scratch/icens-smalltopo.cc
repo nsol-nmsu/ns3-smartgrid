@@ -30,20 +30,22 @@
 #include "ns3/icens-subscriber.h"
 #include "ns3/point-to-point-net-device.h"
 #include "ns3/netanim-module.h"
+#include "ns3/address.h"
 
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("iCenS");
 
 
-void SentPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &);
-void ReceivedPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t packetSize, uint32_t subscription);
+void SentPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &, uint32_t);
+void ReceivedPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t packetSize, uint32_t subscription, Ipv4Address localip);
 
 void SentPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t);
 void ReceivedPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &);
 
-void SentPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &);
-void ReceivedPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t localport);
+void ReceivedPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t localport, uint32_t recvseq);
+void SentPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t sendseq);
+
 
 // Vectors to store the various node types
 std::vector<int> com_nodes, agg_nodes, phy_nodes;
@@ -368,6 +370,7 @@ int main (int argc, char *argv[])
   }
 */
 
+  /*
   AnimationInterface::SetConstantPosition(nodes.Get(com_nodes[0]), 500, 0);
   AnimationInterface::SetConstantPosition(nodes.Get(com_nodes[1]), 250, 250);
   AnimationInterface::SetConstantPosition(nodes.Get(com_nodes[2]), 750, 250);
@@ -385,6 +388,7 @@ int main (int argc, char *argv[])
   AnimationInterface::SetConstantPosition(nodes.Get(phy_nodes[3]), 1000, 1000);
 
   AnimationInterface anim("anim-ip-smalltopo.xml");
+*/
 
   //Open trace file for writing
   tracefile.open("ip-icens-trace.csv", std::ios::out);
@@ -392,6 +396,7 @@ int main (int argc, char *argv[])
 
   std::string strcallback;
 
+  
   //Trace transmitted packet from [physical nodes]
   for (int i=0; i<(int)phy_nodes.size(); i++) {
 	strcallback = "/NodeList/" + std::to_string(phy_nodes[i]) + "/ApplicationList/" + "*/SentPacket";
@@ -401,25 +406,25 @@ int main (int argc, char *argv[])
   //Trace received packet at [compute nodes]
   for (int i=0; i<(int)com_nodes.size(); i++) {
 	strcallback = "/NodeList/" + std::to_string(com_nodes[i]) + "/ApplicationList/" + "*/ReceivedPacket";
-        Config::ConnectWithoutContext(strcallback, MakeCallback(&ReceivedPacketCallbackCom));
+	Config::ConnectWithoutContext(strcallback, MakeCallback(&ReceivedPacketCallbackCom));
   }
 
   //Trace sent packet from [compute nodes]
   for (int i=0; i<(int)com_nodes.size(); i++) {
         strcallback = "/NodeList/" + std::to_string(com_nodes[i]) + "/ApplicationList/" + "*/SentPacket";
-        Config::ConnectWithoutContext(strcallback, MakeCallback(&SentPacketCallbackCom));
+	Config::ConnectWithoutContext(strcallback, MakeCallback(&SentPacketCallbackCom));
   }
 
   //Trace received packet at [physical nodes]
   for (int i=0; i<(int)phy_nodes.size(); i++) {
-       	strcallback = "/NodeList/" + std::to_string(phy_nodes[i]) + "/ApplicationList/" + "*/ReceivedPacket";
-      	Config::ConnectWithoutContext(strcallback, MakeCallback(&ReceivedPacketCallbackPhy));
+      	strcallback = "/NodeList/" + std::to_string(phy_nodes[i]) + "/ApplicationList/" + "*/ReceivedPacket";
+	Config::ConnectWithoutContext(strcallback, MakeCallback(&ReceivedPacketCallbackPhy));
   }
 
   //Trace received packet at [aggregation nodes]
   for (int i=0; i<(int)agg_nodes.size(); i++) {
         strcallback = "/NodeList/" + std::to_string(agg_nodes[i]) + "/ApplicationList/" + "*/ReceivedPacket";
-        Config::ConnectWithoutContext(strcallback, MakeCallback(&ReceivedPacketCallbackAgg));
+	Config::ConnectWithoutContext(strcallback, MakeCallback(&ReceivedPacketCallbackAgg));
   }
 
   //Trace sent packet at [aggregation nodes]
@@ -427,6 +432,7 @@ int main (int argc, char *argv[])
         strcallback = "/NodeList/" + std::to_string(agg_nodes[i]) + "/ApplicationList/" + "*/SentPacket";
         Config::ConnectWithoutContext(strcallback, MakeCallback(&SentPacketCallbackAgg));
   }
+
 
   //Run actual simulation
   Simulator::Stop (Seconds(50.0));
@@ -437,7 +443,7 @@ int main (int argc, char *argv[])
 
 
 //Define callbacks for writing to tracefile
-void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &address) {
+void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t packetuid) {
 
 	int packetSize = packet->GetSize ();
 
@@ -471,7 +477,7 @@ void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &a
 	}
 }
 
-void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport, uint32_t packetSize, uint32_t subscription) {
+void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport, uint32_t packetSize, uint32_t subscription, Ipv4Address localip) {
 
         packet->RemoveAllPacketTags ();
         packet->RemoveAllByteTags ();
@@ -536,7 +542,7 @@ void ReceivedPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Addres
 	}
 }
 
-void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address,  uint32_t localport) {
+void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address,  uint32_t localport, uint32_t recvseq) {
 
         int packetSize = packet->GetSize ();
 
@@ -563,7 +569,7 @@ void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Addres
 
 }
 
-void SentPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address) {
+void SentPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t sendseq) {
 	if (InetSocketAddress::ConvertFrom (address).GetPort () == 6000) {
         	tracefile << nodeid << ", sent, " << "/direct/com/pmu/agg" << nodeid << "/" << packet->GetUid () << ", " << packet->GetSize () << ", " << std::fixed
 			<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;

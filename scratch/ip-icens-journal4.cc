@@ -37,14 +37,14 @@ namespace ns3 {
 //NS_LOG_COMPONENT_DEFINE ("iCenS");
 
 
-void SentPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &);
-void ReceivedPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t packetSize, uint32_t subscription);
+void SentPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &, uint32_t);
+void ReceivedPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t packetSize, uint32_t subscription, Ipv4Address localip);
 
 void SentPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t);
 void ReceivedPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &);
 
-void SentPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &);
-void ReceivedPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t localport);
+void ReceivedPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t localport, uint32_t seqNo);
+void SentPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t seqNo);
 
 // Vectors to store the various node types
 std::vector<int> com_nodes, agg_nodes, phy_nodes;
@@ -457,7 +457,7 @@ int main (int argc, char *argv[])
 
 
 //Define callbacks for writing to tracefile
-void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &address) {
+void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t seqNo) {
 
 	int packetSize = packet->GetSize ();
 
@@ -491,7 +491,7 @@ void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &a
 	}
 }
 
-void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport, uint32_t packetSize, uint32_t subscription) {
+void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport, uint32_t packetSize, uint32_t subscription, Ipv4Address localip) {
 
         packet->RemoveAllPacketTags ();
         packet->RemoveAllByteTags ();
@@ -556,7 +556,7 @@ void ReceivedPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Addres
 	}
 }
 
-void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address,  uint32_t localport) {
+void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address,  uint32_t localport, uint32_t seqNo) {
 
 	int packetSize = packet->GetSize ();
 
@@ -583,7 +583,7 @@ void ReceivedPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Addres
 
 }
 
-void SentPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address) {
+void SentPacketCallbackAgg(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t seqNo) {
 	if (InetSocketAddress::ConvertFrom (address).GetPort () == 6000) {
         	tracefile << nodeid << ", sent, " << "/direct/com/pmu/agg" << nodeid << "/" << packet->GetUid () << ", " << packet->GetSize () << ", " << std::fixed
 			<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;

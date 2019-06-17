@@ -260,7 +260,7 @@ iCenSProducer::HandleRead (Ptr<Socket> socket)
     }
 
     // Callback for received packet
-    m_receivedPacket (GetNode()->GetId(), packet, m_remote_address, m_local_port, m_subscription, m_local_ip);
+    m_receivedPacket (GetNode()->GetId(), packet, m_remote_address, m_local_port, m_packet_size, m_subscription, m_local_ip);
   }
 
 }

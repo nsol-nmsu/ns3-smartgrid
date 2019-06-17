@@ -89,7 +89,7 @@ private:
   std::vector<Address> m_client_addresses;
   Ipv4Address     m_local_ip;
 
-  TracedCallback<uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t, Ipv4Address> m_receivedPacket;
+  TracedCallback<uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t, uint32_t, Ipv4Address> m_receivedPacket;
   TracedCallback<uint32_t, Ptr<Packet>, const Address &, uint32_t> m_sentPacket;
 
 };

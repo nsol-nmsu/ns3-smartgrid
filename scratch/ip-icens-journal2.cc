@@ -37,14 +37,14 @@ namespace ns3 {
 //NS_LOG_COMPONENT_DEFINE ("iCenS");
 
 
-void SentPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &, uint32_t);
-void ReceivedPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t subscription, Ipv4Address local_ip);
+void SentPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &, uint32_t seqNo);
+void ReceivedPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t, uint32_t packetSize, uint32_t subscription, Ipv4Address localip);
 
 void SentPacketCallbackCom(uint32_t, Ptr<Packet>, const Address &, uint32_t);
 void ReceivedPacketCallbackPhy(uint32_t, Ptr<Packet>, const Address &);
 
-void SentPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t);
 void ReceivedPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t localport, uint32_t seqNo);
+void SentPacketCallbackAgg(uint32_t, Ptr<Packet>, const Address &, uint32_t seqNo);
 
 // Vectors to store the various node types
 std::vector<int> com_nodes, agg_nodes, phy_nodes;
@@ -515,32 +515,34 @@ void SentPacketCallbackPhy(uint32_t nodeid, Ptr<Packet> packet, const Address &a
 	}
 }
 
-void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport, uint32_t subscription, Ipv4Address local_ip) {
+void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport, uint32_t packetSize, uint32_t subscription, Ipv4Address localip) {
 
-	int packetSize = packet->GetSize();
+	packet->RemoveAllPacketTags ();
+        packet->RemoveAllByteTags ();
 
-	//Extra 4 bytes already removed at COM app layer while checking if sequence number is greater than 100
+        //Get subscription value set in packet's header
+        iCenSHeader packetHeader;
+        packet->RemoveHeader(packetHeader);
 
-	if (subscription == 1 || subscription == 2) {
-		//Do not log subscription packet received at com nodes
-	}
-	else {
-		//At this point "subscription" parameter contains sequence number of packet
-		if (localport == 5000) {
-                	std::stringstream ss;   std::string str_ip_address;
-                	ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
-                	ss >> str_ip_address;
+        if (packetHeader.GetSubscription() == 1 || packetHeader.GetSubscription() == 2) {
+                //Do not log subscription packet received at com nodes
+        }
+        else {
+                if (localport == 5000) {
+                        std::stringstream ss;   std::string str_ip_address;
+                        ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
+                        ss >> str_ip_address;
 
-		    tracefile << nodeid << ", recv, " << "/urgent/com/error/phy"  << GetNodeFromIP(str_ip_address) << "/" << subscription << ", " << packetSize << ", " << std::fixed
-				<< std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
-		}
+                    tracefile << nodeid << ", recv, " << "/urgent/com/error/phy"  << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize - 2 << ", " << std::fixed
+                                << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
+                }
 
                 if (localport == 6000) {
                         std::stringstream ss;   std::string str_ip_address;
                         ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                         ss >> str_ip_address;
 
-                    tracefile << nodeid << ", recv, " << "/direct/com/pmu/agg"  << GetNodeFromIP(str_ip_address) << "/" << subscription << ", " << packetSize << ", " << std::fixed
+                    tracefile << nodeid << ", recv, " << "/direct/com/pmu/agg"  << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed
                                 << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
 
@@ -549,10 +551,11 @@ void ReceivedPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Addres
                         ss << InetSocketAddress::ConvertFrom (address).GetIpv4();
                         ss >> str_ip_address;
 
-                    tracefile << nodeid << ", recv, " << "/direct/com/ami/agg"  << GetNodeFromIP(str_ip_address) << "/" << subscription << ", " << packetSize << ", " << std::fixed
+                    tracefile << nodeid << ", recv, " << "/direct/com/ami/agg"  << GetNodeFromIP(str_ip_address) << "/" << packet->GetUid () << ", " << packetSize << ", " << std::fixed
                                 << std::setprecision(9) << (Simulator::Now().GetNanoSeconds())/1000000000.0 << std::endl;
                 }
-	}
+        }
+
 }
 
 void SentPacketCallbackCom(uint32_t nodeid, Ptr<Packet> packet, const Address &address, uint32_t localport) {
